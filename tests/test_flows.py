@@ -232,3 +232,21 @@ def test_proctor_review_changes_score(client, setup):
     login(client, "s@x.io", "password1")
     hb = client.post(f"/api/session/{s.id}/heartbeat", json={}).json
     assert [m["body"] for m in hb["messages"] if m["kind"] == "warning"] == ["Eyes on screen"]
+
+
+def test_enrolled_face_is_reencoded_when_the_model_changes(client, setup):
+    """A template from another model must not let anyone through unchecked."""
+    from app.services import save_file
+
+    student = setup["student"]
+    blue = cv2.imdecode(np.frombuffer(base64.b64decode(photo(BLUE).split(",")[1]), np.uint8), 1)
+    student.photo_path = save_file(f"users/{student.id}/profile.jpg", blue)
+    student.face_backend = "basic"  # enrolled before the accurate model was installed
+    student.face_embedding = np.ones(10, dtype=np.float32)
+    db.session.commit()
+    login(client, "s@x.io", "password1")
+    r = begin(client, setup["exam"], photo(RED))
+    assert r.status_code == 400 and "match" in r.json["error"]
+    db.session.refresh(student)
+    assert student.face_backend == "fake"
+    assert begin(client, setup["exam"], photo(BLUE)).json["verified"]

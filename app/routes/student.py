@@ -1,4 +1,4 @@
-
+import cv2
 from flask import Blueprint, abort, flash, jsonify, redirect, render_template, request, session as flask_session, url_for
 from flask_login import current_user
 
@@ -6,7 +6,7 @@ from ..ai import face_analyzer
 from ..ai.pipeline import decode_image
 from ..extensions import db
 from ..models import Exam, ExamSession, Snapshot, utcnow
-from ..services import audit, build_question_order, extract_single_face, record_event, save_file
+from ..services import audit, build_question_order, extract_single_face, record_event, save_file, storage_path
 from ..utils import student_required
 
 bp = Blueprint("student", __name__)
@@ -99,11 +99,11 @@ def begin(exam_id):
     fail_key = f"idfail-{exam.id}"
     similarity = None
     verified = True
-    enrolled = current_user.face_embedding
-    if enrolled is not None and current_user.face_backend == analyzer.backend:
+    enrolled = _enrolled_embedding(current_user, analyzer)
+    if enrolled is not None:
         similarity = analyzer.similarity(enrolled, emb)
         verified = analyzer.is_match(similarity)
-    elif enrolled is None:
+    else:
         verified = not exam.require_identity  # no profile photo -> proctor must approve when identity is required
 
     liveness = payload.get("liveness") or {}
@@ -115,11 +115,19 @@ def begin(exam_id):
         fails = flask_session.get(fail_key, 0) + 1
         flask_session[fail_key] = fails
         if fails < MAX_IDENTITY_ATTEMPTS:
-            reason = (
-                "Liveness check was not completed."
-                if liveness_passed is False
-                else "Your face does not match your registered photo."
-            )
+            db.session.commit()  # keep a re-encoded face template
+            if liveness_passed is False:
+                reason = "Liveness check was not completed."
+            else:
+                reason = (
+                    f"Your face does not match your registered photo "
+                    f"(match {similarity:.2f}, needed {analyzer.threshold:.2f})."
+                )
+                if analyzer.backend == "basic":
+                    reason += (
+                        " Note: the server is using its basic backup face model, which is sensitive to lighting;"
+                        " ask your administrator to install the accurate model."
+                    )
             return jsonify(
                 ok=False,
                 error=f"{reason} Remove glasses/masks, improve lighting and try again. "
@@ -169,6 +177,31 @@ def begin(exam_id):
     audit("exam_started", f"session:{s.id}", f"exam {exam.id}, verified={verified}, similarity={similarity}")
     db.session.commit()
     return jsonify(ok=True, redirect=url_for("student.room", session_id=s.id), verified=verified, similarity=similarity)
+
+
+def _enrolled_embedding(user, analyzer):
+    """The user's face template for the active model.
+
+    Templates from different models cannot be compared, so if the model changed since
+    enrolment (e.g. the deep models were installed later) the stored profile photo is
+    re-encoded with the current model and saved.
+    """
+    if user.face_embedding is None:
+        return None
+    if user.face_backend == analyzer.backend:
+        return user.face_embedding
+    if not user.photo_path:
+        return None
+    try:
+        img = cv2.imread(storage_path(user.photo_path))
+    except ValueError:
+        img = None
+    emb, _ = extract_single_face(img) if img is not None else (None, None)
+    if emb is None:
+        return None  # photo no longer usable -> treated as "not enrolled" (proctor approval)
+    user.face_embedding = emb
+    user.face_backend = analyzer.backend
+    return emb
 
 
 def _own_session(session_id):
