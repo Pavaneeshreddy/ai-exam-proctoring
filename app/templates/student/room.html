@@ -1,0 +1,92 @@
+{% extends "base.html" %}
+{% block title %}{{ exam.title }}{% endblock %}
+{% block head %}<style>.q-text, .opt { user-select: none; -webkit-user-select: none; }</style>{% endblock %}
+{% block body %}
+<div class="room" id="room">
+  <header class="room-top">
+    <div class="brand-mark" style="width:30px;height:30px"><i data-lucide="scan-face" style="width:16px;height:16px"></i></div>
+    <div class="title">{{ exam.title }}<small>{{ current_user.name }}{% if current_user.student_code %} · {{ current_user.student_code }}{% endif %}</small></div>
+    <div class="spacer" style="flex:1"></div>
+    <span class="save-state" id="save-state"><i data-lucide="cloud" style="width:14px;height:14px"></i> All changes saved</span>
+    <span class="badge badge-green" id="integrity"><span class="dot"></span> Integrity: good</span>
+    <div class="timer" id="timer"><i data-lucide="timer"></i><span id="timer-text">--:--</span></div>
+    <button class="btn btn-primary" id="submit-btn"><i data-lucide="send"></i> Submit</button>
+  </header>
+  <div class="room-body">
+    <main class="q-area"><div class="q-card" id="q-card"></div></main>
+    <aside class="side">
+      <div class="side-sec">
+        <h4><span>Proctoring camera</span><span id="ai-mode" class="tiny">AI starting…</span></h4>
+        <div class="cam monitor-cam">
+          <video id="cam" class="mirror" playsinline muted></video>
+          <canvas class="overlay mirror" id="cam-overlay"></canvas>
+          <div class="cam-tag"><span class="rec"></span> Monitoring</div>
+        </div>
+        <div class="health" id="health">
+          <div class="h" data-h="face"><span class="d"></span><span>Face</span></div>
+          <div class="h" data-h="identity"><span class="d"></span><span>Identity</span></div>
+          <div class="h" data-h="gaze"><span class="d"></span><span>Attention</span></div>
+          <div class="h" data-h="audio"><span class="d"></span><span>Audio</span></div>
+          <div class="h" data-h="screen"><span class="d"></span><span>Screen</span></div>
+          <div class="h" data-h="network"><span class="d"></span><span>Network</span></div>
+        </div>
+        <div class="meter mt-1" title="Microphone level"><span id="mic-level" style="width:0;background:var(--risk-low)"></span></div>
+      </div>
+      {% if exam.mode == 'written' %}
+      <div class="side-sec">
+        <h4><span>Answer sheets</span><span id="sheet-count">0 pages</span></h4>
+        <p class="small muted">Write on paper. When you finish, hold each page up to the camera and capture it.</p>
+        <div class="row wrap"><button class="btn btn-sm" id="sheet-capture"><i data-lucide="camera"></i> Capture page</button>
+          <label class="btn btn-sm"><i data-lucide="upload"></i> Upload<input type="file" accept="image/*" id="sheet-file" hidden multiple></label></div>
+        <div class="sheet-grid mt-1" id="sheets"></div>
+      </div>
+      {% endif %}
+      <div class="side-sec">
+        <h4><span>Questions</span><span id="progress-text"></span></h4>
+        <div class="palette" id="palette"></div>
+        <div class="legend"><span><i style="background:var(--success)"></i>Answered</span><span><i style="background:var(--warning)"></i>Marked</span><span><i style="border:1.5px solid var(--border)"></i>Not answered</span></div>
+      </div>
+      <div class="side-sec small muted" style="border-bottom:0">
+        <div class="row" style="gap:6px"><i data-lucide="keyboard" style="width:15px;height:15px"></i> Keys A–F select an option; ← → move between questions.</div>
+      </div>
+    </aside>
+  </div>
+</div>
+
+<div class="blocker" id="gate">
+  <div class="box">
+    <div class="big-ic" style="background:rgba(99,102,241,.18);color:#a5b4fc"><i data-lucide="maximize"></i></div>
+    <h2>Ready to begin</h2>
+    <p>The exam runs in full-screen with AI monitoring switched on. Stay in view of the camera until you submit.</p>
+    <button class="btn btn-primary btn-lg mt-2" id="gate-btn"><i data-lucide="play"></i> Enter full-screen & continue</button>
+    <p class="small mt-2" id="gate-msg" style="color:#8b93ad"></p>
+  </div>
+</div>
+<div class="blocker" id="fs-blocker" hidden>
+  <div class="box"><div class="big-ic"><i data-lucide="shrink"></i></div><h2>You left full-screen</h2><p>This has been recorded. Return to full-screen to continue your exam.</p>
+    <button class="btn btn-primary btn-lg mt-2" id="fs-return"><i data-lucide="maximize"></i> Return to full-screen</button></div>
+</div>
+<div class="blocker" id="cam-blocker" hidden>
+  <div class="box"><div class="big-ic"><i data-lucide="video-off"></i></div><h2>Camera disconnected</h2><p>Your camera stopped sending video. This has been reported to your proctor. Reconnect the camera to continue.</p>
+    <button class="btn btn-primary btn-lg mt-2" id="cam-retry"><i data-lucide="refresh-cw"></i> Reconnect camera</button></div>
+</div>
+{% endblock %}
+{% block scripts %}
+<script>
+  window.ROOM = {{ config|tojson }};
+  window.QUESTIONS = {{ questions|tojson }};
+  window.ROOM.urls = {
+    heartbeat: "{{ url_for('api.heartbeat', session_id=s.id) }}",
+    events: "{{ url_for('api.client_events', session_id=s.id) }}",
+    frame: "{{ url_for('api.frame', session_id=s.id) }}",
+    audio: "{{ url_for('api.audio', session_id=s.id) }}",
+    answer: "{{ url_for('api.answer', session_id=s.id) }}",
+    sheet: "{{ url_for('api.answer_sheet', session_id=s.id) }}",
+    submit: "{{ url_for('api.submit', session_id=s.id) }}",
+  };
+</script>
+<script>window.VISION_ASSETS = {{ vision_assets|tojson }};</script>
+<script src="{{ url_for('static', filename='js/vision.js') }}"></script>
+<script src="{{ url_for('static', filename='js/monitor.js') }}"></script>
+<script src="{{ url_for('static', filename='js/room.js') }}"></script>
+{% endblock %}

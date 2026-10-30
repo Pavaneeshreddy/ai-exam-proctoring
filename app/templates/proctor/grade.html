@@ -1,0 +1,41 @@
+{% extends "layout.html" %}
+{% block title %}Grade · {{ s.student.name }}{% endblock %}
+{% block crumbs %}Review / #{{ s.id }} / Grading{% endblock %}
+{% block content %}
+<div class="page-head">
+  <div><h1>Grade answers</h1><p>{{ s.student.name }} · {{ s.exam.title }} · auto-graded questions are already marked.</p></div>
+  <a class="btn" href="{{ url_for('proctor.session_detail', session_id=s.id) }}"><i data-lucide="arrow-left"></i> Session</a>
+</div>
+<div class="grid g-main">
+  <form method="post" class="stack">
+    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+    {% for q in manual %}{% set a = answers.get(q.id) %}
+    <div class="card">
+      <div class="card-head"><h3>Q{{ loop.index }} <span class="badge">{{ q.marks|round(1) }} marks</span></h3>{% if a and a.marks_awarded is not none %}<span class="badge badge-green">Graded</span>{% else %}<span class="badge badge-amber">Ungraded</span>{% endif %}</div>
+      <div class="card-body">
+        <p class="strong" style="white-space:pre-wrap">{{ q.text }}</p>
+        {% if s.exam.mode != 'written' %}
+        <div class="card card-pad" style="background:var(--bg-sunken);white-space:pre-wrap">{{ (a.response if a and a.response else '') or 'No answer given.' }}</div>
+        {% endif %}
+        <div class="grid g-2 mt-2" style="grid-template-columns:160px 1fr;gap:12px">
+          <div class="field mb-0"><label>Marks (max {{ q.marks|round(1) }})</label><input class="input" type="number" step="0.25" min="0" max="{{ q.marks }}" name="marks-{{ q.id }}" value="{{ a.marks_awarded if a and a.marks_awarded is not none else '' }}"></div>
+          <div class="field mb-0"><label>Feedback (optional)</label><input class="input" name="feedback-{{ q.id }}" value="{{ a.feedback if a and a.feedback else '' }}"></div>
+        </div>
+      </div>
+    </div>
+    {% else %}<div class="card empty">All questions in this exam are graded automatically.</div>{% endfor %}
+    {% if manual %}<div class="row" style="justify-content:flex-end"><button class="btn btn-primary btn-lg"><i data-lucide="save"></i> Save marks</button></div>{% endif %}
+  </form>
+  <div class="stack">
+    <div class="card card-pad center">
+      <div class="small muted">Current total</div>
+      <div style="font-size:36px;font-weight:800">{{ s.score|round(2) if s.score is not none else '—' }} <span class="muted" style="font-size:18px">/ {{ s.max_score|round(1) if s.max_score else s.exam.total_marks }}</span></div>
+      {% if s.needs_manual_grading %}<span class="badge badge-amber">Grading incomplete</span>{% else %}<span class="badge badge-green">{{ s.percent }}% · {{ 'Pass' if s.passed else 'Fail' }}</span>{% endif %}
+    </div>
+    {% if s.answer_sheets %}
+    <div class="card"><div class="card-head"><h3><i data-lucide="files"></i> Answer sheets</h3></div>
+      <div class="card-body gallery" style="grid-template-columns:1fr 1fr">{% for p in s.answer_sheets %}<a href="#" data-zoom="{{ url_for('main.media', rel=p) }}"><img src="{{ url_for('main.media', rel=p) }}" alt="Page {{ loop.index }}" style="aspect-ratio:3/4"><span>p.{{ loop.index }}</span></a>{% endfor %}</div></div>
+    {% elif s.exam.mode == 'written' %}<div class="callout warn"><i data-lucide="alert-triangle"></i><div>The student did not upload any answer sheets.</div></div>{% endif %}
+  </div>
+</div>
+{% endblock %}

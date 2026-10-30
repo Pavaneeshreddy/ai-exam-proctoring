@@ -1,0 +1,36 @@
+{% extends "layout.html" %}
+{% block title %}Live monitor{% endblock %}
+{% block crumbs %}Proctoring / Live monitor{% endblock %}
+{% block topbar_extra %}<span class="badge badge-green pulse" id="live-indicator"><span class="dot"></span> Live</span>{% endblock %}
+{% block content %}
+<div class="page-head">
+  <div><h1>Live monitor</h1><p>Camera frames from candidates, refreshed every few seconds and sorted by AI risk.</p></div>
+  <div class="page-actions">
+    <select class="input" id="exam-filter" style="width:auto">
+      <option value="">All exams</option>
+      {% for e in exams %}<option value="{{ e.id }}" {{ 'selected' if selected == e.id }}>{{ e.title }}</option>{% endfor %}
+    </select>
+    <label class="btn" title="Play a sound for critical alerts"><input type="checkbox" id="sound" style="accent-color:var(--primary)"> Sound</label>
+  </div>
+</div>
+<div class="grid g-4 mb-2">
+  <div class="card stat"><div class="icon blue"><i data-lucide="users"></i></div><div><div class="value" id="c-total">0</div><div class="label">Candidates</div></div></div>
+  <div class="card stat"><div class="icon green"><i data-lucide="shield-check"></i></div><div><div class="value" id="c-low">0</div><div class="label">Low risk</div></div></div>
+  <div class="card stat"><div class="icon amber"><i data-lucide="shield-alert"></i></div><div><div class="value" id="c-mid">0</div><div class="label">Medium / high</div></div></div>
+  <div class="card stat"><div class="icon red"><i data-lucide="siren"></i></div><div><div class="value" id="c-crit">0</div><div class="label">Critical</div></div></div>
+</div>
+<div class="live-layout">
+  <div>
+    <div class="tiles" id="tiles"></div>
+    <div class="card empty" id="tiles-empty" hidden><i data-lucide="monitor-off"></i><div>No active candidates right now. Tiles appear when a student starts an exam.</div></div>
+  </div>
+  <div class="card">
+    <div class="card-head"><h3><i data-lucide="bell-ring"></i> Alert feed</h3><span class="small muted" id="alert-updated"></span></div>
+    <div class="alert-feed" id="alerts"><div class="empty small">Waiting for alerts…</div></div>
+  </div>
+</div>
+{% endblock %}
+{% block scripts %}
+<script>window.LIVE = {{ {'sessions': url_for('api.live_sessions'), 'alerts': url_for('api.live_alerts')}|tojson }};</script>
+<script src="{{ url_for('static', filename='js/live.js') }}"></script>
+{% endblock %}

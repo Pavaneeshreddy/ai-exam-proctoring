@@ -1,0 +1,119 @@
+{% extends "layout.html" %}
+{% block title %}Prepare · {{ exam.title }}{% endblock %}
+{% block crumbs %}My exams / {{ exam.title }} / Pre-exam check{% endblock %}
+{% block content %}
+<div class="page-head">
+  <div><h1>{{ exam.title }}</h1><p>{{ exam.subject or '' }} · {{ exam.duration_minutes }} minutes · {{ exam.questions|length }} questions · {{ exam.MODES[exam.mode] }}</p></div>
+  <a class="btn" href="{{ url_for('student.dashboard') }}"><i data-lucide="arrow-left"></i> Back</a>
+</div>
+
+<div class="steps-bar" id="steps">
+  <div class="s active" data-step="1"><span class="n">1</span><span class="t">System check</span></div>
+  <div class="s" data-step="2"><span class="n">2</span><span class="t">Rules & consent</span></div>
+  <div class="s" data-step="3"><span class="n">3</span><span class="t">Identity & liveness</span></div>
+</div>
+
+<!-- Step 1 -->
+<section data-panel="1" class="grid g-main">
+  <div class="card">
+    <div class="card-head"><h3><i data-lucide="stethoscope"></i> Checking your device</h3><button class="btn btn-sm" id="recheck"><i data-lucide="refresh-cw"></i> Re-run</button></div>
+    <div class="card-body">
+      <ul class="check-list" id="checks">
+        {% for key, icon, label, desc in [
+          ('camera','video','Camera','Needed for continuous face monitoring'),
+          ('mic','mic','Microphone','Used to detect conversations. Raw audio is never uploaded'),
+          ('browser','globe','Browser support','Full-screen, WebAssembly and media APIs'),
+          ('screen','monitor','Display','A single monitor is required'),
+          ('network','wifi','Network','Stable connection to the exam server'),
+          ('ai','cpu','AI models','On-device face and object models'),
+        ] %}
+        <li data-check="{{ key }}"><div class="status-icon"><i data-lucide="{{ icon }}"></i></div><div><div class="strong">{{ label }}</div><div class="small muted" data-desc>{{ desc }}</div></div><span class="st badge">Waiting</span></li>
+        {% endfor %}
+      </ul>
+      <div class="mt-2"><div class="label mb-1">Microphone level</div><div class="meter"><span id="mic-level" style="width:0"></span></div></div>
+    </div>
+    <div class="card-foot"><button class="btn btn-primary" id="to-step-2" disabled>Continue <i data-lucide="arrow-right"></i></button></div>
+  </div>
+  <div class="card">
+    <div class="card-head"><h3><i data-lucide="camera"></i> Camera preview</h3></div>
+    <div class="card-body"><div class="cam"><video id="preview" class="mirror" playsinline muted></video><canvas class="overlay mirror" id="preview-overlay"></canvas><div class="cam-msg" id="preview-msg">Starting camera…</div></div>
+      <p class="small muted mt-1">Sit in a well-lit, quiet room. Your face should be clearly visible and centred.</p></div>
+  </div>
+</section>
+
+<!-- Step 2 -->
+<section data-panel="2" hidden>
+  <div class="card">
+    <div class="card-head"><h3><i data-lucide="scroll-text"></i> Exam rules</h3><span class="badge badge-indigo">Please read carefully</span></div>
+    <div class="card-body">
+      {% if exam.instructions %}<div class="callout mb-2"><i data-lucide="info"></i><div style="white-space:pre-wrap">{{ exam.instructions }}</div></div>{% endif %}
+      <ul class="rules">
+        <li><i data-lucide="scan-face"></i><div><b>The same person must remain visible throughout.</b> A photo is taken now, and your face is compared with it every few seconds until you submit.</div></li>
+        <li><i data-lucide="users"></i><div><b>Be alone.</b> Other people in view or voices in the room are detected and reported.</div></li>
+        <li><i data-lucide="smartphone"></i><div><b>No phones, books, notes or extra screens</b>{% if exam.mode == 'written' %} (blank answer sheets are allowed){% endif %}. Objects are detected by AI and screenshots are saved as evidence.</div></li>
+        <li><i data-lucide="maximize"></i><div><b>Stay in full-screen</b> and on this tab. Switching tabs, copying or opening developer tools is logged.</div></li>
+        <li><i data-lucide="eye"></i><div><b>Keep your eyes on {{ 'the screen and your paper' if exam.mode == 'written' else 'the screen' }}.</b> Repeatedly looking away or turning your head is flagged.</div></li>
+        <li><i data-lucide="gauge"></i><div><b>An AI fraud score is calculated</b> from these events. {% if exam.auto_terminate %}If it reaches {{ exam.critical_threshold }}, the exam ends automatically.{% else %}High scores are reviewed by a proctor.{% endif %}</div></li>
+      </ul>
+      <label class="check mt-2"><input type="checkbox" id="consent"><div><strong>I understand and agree.</strong><span>I consent to camera, microphone and browser activity being monitored and recorded for this exam. Evidence is retained for review by authorised examiners.</span></div></label>
+    </div>
+    <div class="card-foot"><button class="btn" data-back="1"><i data-lucide="arrow-left"></i> Back</button><button class="btn btn-primary" id="to-step-3" disabled>Continue <i data-lucide="arrow-right"></i></button></div>
+  </div>
+</section>
+
+<!-- Step 3 -->
+<section data-panel="3" hidden class="grid g-main">
+  <div class="card">
+    <div class="card-head"><h3><i data-lucide="scan-face"></i> Identity verification</h3><span class="badge" id="id-state">Waiting</span></div>
+    <div class="card-body">
+      <div class="cam" style="max-width:640px;margin:0 auto">
+        <video id="id-video" class="mirror" playsinline muted></video>
+        <canvas class="overlay mirror" id="id-overlay"></canvas>
+        <img id="id-photo" alt="Captured photo" style="transform:scaleX(-1)" hidden>
+        <div class="guide" id="id-guide"></div>
+        <div class="cam-msg" id="id-msg">Look straight at the camera.</div>
+      </div>
+      {% if exam.require_liveness %}
+      <div class="mt-2"><div class="label mb-1">Liveness challenge <span class="muted small">(proves a live person, not a photo)</span></div><div class="challenge" id="challenges"></div></div>
+      {% endif %}
+    </div>
+    <div class="card-foot" style="justify-content:space-between">
+      <button class="btn" data-back="2"><i data-lucide="arrow-left"></i> Back</button>
+      <div class="row">
+        <button class="btn" id="retake" hidden><i data-lucide="rotate-ccw"></i> Retake</button>
+        <button class="btn" id="capture" disabled><i data-lucide="aperture"></i> Capture photo</button>
+        <button class="btn btn-primary" id="start" disabled><i data-lucide="play"></i> Verify & start exam</button>
+      </div>
+    </div>
+  </div>
+  <div class="stack">
+    <div class="card card-pad">
+      <h3 class="mb-1">Your registered face</h3>
+      {% if has_enrolled_face %}
+        <img src="{{ url_for('main.media', rel=current_user.photo_path) }}" alt="Registered photo" style="border-radius:12px;aspect-ratio:4/3;object-fit:cover;width:100%;transform:scaleX(-1)">
+        <p class="small muted mt-1">The start photo is matched against this photo ({{ backend }} model).</p>
+      {% else %}
+        <div class="callout warn"><i data-lucide="alert-triangle"></i><div>No face photo on file. {% if exam.require_identity %}A proctor must approve your identity before the timer starts.{% endif %} <a href="{{ url_for('auth.profile') }}">Enrol now</a></div></div>
+      {% endif %}
+    </div>
+    {% if exam.access_code %}
+    <div class="card card-pad"><div class="field mb-0"><label for="access-code">Exam access code</label><input class="input" id="access-code" placeholder="Provided by your examiner" autocomplete="off"></div></div>
+    {% endif %}
+    <div class="card card-pad small">
+      <div class="strong mb-1">Tips for a quick match</div>
+      <ul class="muted" style="margin:0;padding-left:18px">
+        <li>Face a window or lamp; avoid strong backlight.</li>
+        <li>Remove caps, sunglasses and masks.</li>
+        <li>Keep your whole face inside the oval.</li>
+      </ul>
+      <p class="mt-1 mb-0 muted">Attempts left before proctor approval: <b>{{ attempts_left }}</b></p>
+    </div>
+  </div>
+</section>
+{% endblock %}
+{% block scripts %}
+<script>window.PREPARE = {{ {'beginUrl': url_for('student.begin', exam_id=exam.id), 'liveness': exam.require_liveness, 'monitorAudio': exam.monitor_audio}|tojson }};</script>
+<script>window.VISION_ASSETS = {{ vision_assets|tojson }};</script>
+<script src="{{ url_for('static', filename='js/vision.js') }}"></script>
+<script src="{{ url_for('static', filename='js/prepare.js') }}"></script>
+{% endblock %}

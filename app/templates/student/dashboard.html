@@ -1,0 +1,69 @@
+{% extends "layout.html" %}
+{% from "partials/macros.html" import status_badge %}
+{% block title %}My exams{% endblock %}
+{% block crumbs %}Student / My exams{% endblock %}
+{% block content %}
+<div class="page-head">
+  <div><h1>Hello, {{ current_user.name.split()[0] }} 👋</h1><p>Your exams, results and identity status in one place.</p></div>
+  {% if current_user.face_embedding is none %}<a class="btn btn-primary" href="{{ url_for('auth.profile') }}"><i data-lucide="scan-face"></i> Enrol your face ID</a>{% endif %}
+</div>
+{% if current_user.face_embedding is none %}
+<div class="callout warn mb-2"><i data-lucide="alert-triangle"></i><div><b>Face ID not enrolled.</b> Without a registered face a proctor has to approve you manually before every exam. <a href="{{ url_for('auth.profile') }}">Enrol now</a>; it takes 10 seconds.</div></div>
+{% endif %}
+<div class="grid g-3 mb-2">
+  <div class="card stat"><div class="icon"><i data-lucide="calendar-clock"></i></div><div><div class="value">{{ stats.upcoming }}</div><div class="label">Available & upcoming</div></div></div>
+  <div class="card stat"><div class="icon green"><i data-lucide="check-circle-2"></i></div><div><div class="value">{{ stats.completed }}</div><div class="label">Completed attempts</div></div></div>
+  <div class="card stat"><div class="icon blue"><i data-lucide="trending-up"></i></div><div><div class="value">{{ stats.average ~ '%' if stats.average is not none else '—' }}</div><div class="label">Average score</div></div></div>
+</div>
+
+<h2 class="mb-1 mt-3">Exams</h2>
+{% if cards %}
+<div class="grid g-3">
+  {% for c in cards %}{% set e = c.exam %}
+  <div class="card exam-card">
+    <div class="row between">
+      <span class="badge {{ 'badge-indigo' if e.mode == 'online' else 'badge-blue' }}"><i data-lucide="{{ 'monitor' if e.mode == 'online' else 'pen-line' }}" style="width:13px;height:13px"></i> {{ 'Online' if e.mode == 'online' else 'Written' }}</span>
+      {% if c.state == 'open' %}<span class="badge badge-green pulse"><span class="dot"></span> Open now</span>
+      {% elif c.state == 'resume' %}<span class="badge badge-amber pulse"><span class="dot"></span> In progress</span>
+      {% elif c.state == 'upcoming' %}<span class="badge">Opens {{ e.start_at|dt('%d %b, %H:%M') }}</span>
+      {% elif c.state == 'completed' %}<span class="badge badge-green"><i data-lucide="check" style="width:13px;height:13px"></i> Completed</span>
+      {% else %}<span class="badge">Closed</span>{% endif %}
+    </div>
+    <div><h3>{{ e.title }}</h3><div class="small muted">{{ e.subject or '' }}</div></div>
+    {% if e.description %}<p class="small muted mb-0">{{ e.description|truncate(140) }}</p>{% endif %}
+    <div class="meta"><span><i data-lucide="clock"></i>{{ e.duration_minutes }} min</span><span><i data-lucide="list-checks"></i>{{ e.questions|length }} questions</span><span><i data-lucide="award"></i>{{ e.total_marks|round(1) }} marks</span></div>
+    <div class="meta"><span><i data-lucide="scan-face"></i>Face ID</span>{% if e.monitor_audio %}<span><i data-lucide="mic"></i>Audio</span>{% endif %}{% if e.monitor_objects %}<span><i data-lucide="smartphone"></i>Objects</span>{% endif %}{% if e.enforce_fullscreen %}<span><i data-lucide="maximize"></i>Full-screen</span>{% endif %}</div>
+    <div class="foot">
+      {% if e.end_at %}<span class="small muted">Closes {{ e.end_at|dt('%d %b, %H:%M') }}</span>{% else %}<span></span>{% endif %}
+      {% if c.state == 'open' %}<a class="btn btn-primary" href="{{ url_for('student.prepare', exam_id=e.id) }}"><i data-lucide="play"></i> Start</a>
+      {% elif c.state == 'resume' %}<a class="btn btn-primary" href="{{ url_for('student.room', session_id=c.active.id) }}"><i data-lucide="rotate-ccw"></i> Resume</a>
+      {% elif c.state == 'completed' and c.attempts %}<a class="btn" href="{{ url_for('student.result', session_id=c.attempts[0].id) }}">View result</a>
+      {% else %}<button class="btn" disabled>Not available</button>{% endif %}
+    </div>
+  </div>
+  {% endfor %}
+</div>
+{% else %}
+<div class="card empty"><i data-lucide="inbox"></i><div>No exams have been published yet.</div></div>
+{% endif %}
+
+<h2 class="mb-1 mt-3">History</h2>
+<div class="card table-wrap">
+  {% if history %}
+  <table class="table">
+    <thead><tr><th>Exam</th><th>Started</th><th>Status</th><th class="num">Score</th><th></th></tr></thead>
+    <tbody>
+    {% for s in history %}
+      <tr>
+        <td><div class="strong">{{ s.exam.title }}</div><small class="muted">{{ s.exam.subject or '' }}</small></td>
+        <td>{{ s.started_at|dt }}</td>
+        <td>{{ status_badge(s) }}</td>
+        <td class="num">{% if s.exam.show_results and s.percent is not none and not s.needs_manual_grading %}<b>{{ s.percent }}%</b>{% elif s.is_finished %}<span class="muted small">{{ 'Awaiting grading' if s.needs_manual_grading else 'Hidden' }}</span>{% else %}—{% endif %}</td>
+        <td class="num"><a class="btn btn-sm" href="{{ url_for('student.result', session_id=s.id) if s.is_finished else url_for('student.room', session_id=s.id) }}">{{ 'Details' if s.is_finished else 'Resume' }}</a></td>
+      </tr>
+    {% endfor %}
+    </tbody>
+  </table>
+  {% else %}<div class="empty"><i data-lucide="history"></i><div>You have not taken any exams yet.</div></div>{% endif %}
+</div>
+{% endblock %}

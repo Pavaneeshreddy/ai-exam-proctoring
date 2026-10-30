@@ -1,0 +1,45 @@
+{% extends "base.html" %}
+{% from "partials/capture.html" import face_capture %}
+{% block title %}Student registration{% endblock %}
+{% block body %}
+<div class="auth-wrap" style="grid-template-columns: .8fr 1.2fr">
+  {% include "auth/_hero.html" %}
+  <div class="auth-panel">
+    <div class="auth-card wide">
+      <h2>Create your student account</h2>
+      <p class="muted mb-2">Your face photo becomes your exam ID. Before every exam it is compared with a new photo to confirm that you are the one writing.</p>
+      <form method="post" class="card" id="register-form" novalidate>
+        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+        <div class="grid g-2 card-body" style="gap:24px">
+          <div>
+            <div class="field"><label>Full name</label><input class="input" name="name" value="{{ form.get('name','') }}" required></div>
+            <div class="field"><label>Email</label><input class="input" type="email" name="email" value="{{ form.get('email','') }}" required></div>
+            <div class="grid g-2" style="gap:12px">
+              <div class="field"><label>Student ID</label><input class="input" name="student_code" value="{{ form.get('student_code','') }}" placeholder="e.g. CS2101"></div>
+              <div class="field"><label>Department</label><input class="input" name="department" value="{{ form.get('department','') }}"></div>
+            </div>
+            <div class="field"><label>Password</label><input class="input" type="password" name="password" minlength="8" required><span class="hint">At least 8 characters.</span></div>
+            <div class="field"><label>Confirm password</label><input class="input" type="password" name="confirm" required></div>
+          </div>
+          <div>
+            <div class="label mb-1">Face ID photo</div>
+            {{ face_capture('photo', note='Use good, even lighting, remove sunglasses or a mask, and make sure no one else is in the frame.') }}
+          </div>
+        </div>
+        <div class="card-foot" style="justify-content:space-between">
+          <span class="small muted">Already registered? <a href="{{ url_for('auth.login') }}">Sign in</a></span>
+          <button class="btn btn-primary btn-lg" id="register-btn"><i data-lucide="user-check"></i> Create account</button>
+        </div>
+      </form>
+    </div>
+  </div>
+</div>
+{% endblock %}
+{% block scripts %}
+<script src="{{ url_for('static', filename='js/capture.js') }}"></script>
+<script>
+document.getElementById('register-form').addEventListener('submit', (e) => {
+  if (!document.querySelector('input[name=photo]').value) { e.preventDefault(); App.toast('Please capture your face photo first.', 'error'); }
+});
+</script>
+{% endblock %}

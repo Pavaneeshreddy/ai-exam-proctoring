@@ -1,0 +1,54 @@
+{% extends "base.html" %}
+{% block title %}AI online exam proctoring{% endblock %}
+{% block body %}
+<div class="landing">
+  <nav>
+    <div class="brand" style="padding:0"><div class="brand-mark"><i data-lucide="scan-face"></i></div><div>{{ app_name }}<small>Exam integrity</small></div></div>
+    <div class="row">
+      <a class="btn btn-ghost" style="color:#e8ebf5" href="{{ url_for('auth.login') }}">Sign in</a>
+      <a class="btn btn-primary" href="{{ url_for('auth.register') }}">Student sign-up</a>
+    </div>
+  </nav>
+  <section class="hero">
+    <div>
+      <span class="badge badge-indigo" style="background:rgba(129,140,248,.15);color:#c7d2fe"><i data-lucide="sparkles" style="width:14px;height:14px"></i> Deep-learning proctoring</span>
+      <h1 class="mt-2">Fair online exams,<br><span class="grad">verified by AI</span> from the first photo to the last answer.</h1>
+      <p class="lead">A photo is taken when the exam starts, and the AI checks throughout the exam that the same person is still at the camera. It also tracks head pose and gaze, detects phones and additional people with YOLOv8, listens for conversation and watches browser activity. Every event is weighed by an explainable fraud score.</p>
+      <div class="row wrap">
+        <a class="btn btn-primary btn-lg" href="{{ url_for('auth.login') }}"><i data-lucide="log-in"></i> Sign in</a>
+        <a class="btn btn-lg" style="background:transparent;color:#fff;border-color:rgba(255,255,255,.2)" href="{{ url_for('auth.register') }}"><i data-lucide="user-plus"></i> Register with face ID</a>
+      </div>
+    </div>
+    <div class="mock">
+      <div class="mock-cam"><div class="mock-face"></div><div class="mock-phone"></div>
+        <div class="cam-tag" style="position:absolute;top:10px;left:10px"><span class="rec"></span> LIVE · AI monitoring</div></div>
+      <div class="mock-bar">
+        <span class="chip">👤 1 face</span><span class="chip">🎯 Gaze on screen</span><span class="chip">🔇 Quiet</span><span class="chip">🖥️ Full-screen</span><span class="chip" style="color:#fca5a5">⚠ Fraud score 42 · High</span>
+      </div>
+    </div>
+  </section>
+  <section class="section">
+    <div class="feat-grid">
+      {% for icon, title, text in [
+        ('scan-face', 'Continuous identity', 'A reference photo is captured at the start of the exam and matched against your registered face. Every few seconds the AI checks that the same person is still writing.'),
+        ('eye', 'Head pose & gaze', 'MediaPipe face landmarks estimate yaw, pitch and eye direction to catch repeated looking away, with a lenient mode for written papers.'),
+        ('smartphone', 'YOLOv8 object detection', 'Detects phones, books, extra screens and additional people in the frame. Each detection is saved with an evidence screenshot.'),
+        ('audio-lines', 'Audio intelligence', 'Calibrated voice-activity detection and pitch clustering tell background noise apart from a conversation between two voices.'),
+        ('app-window', 'Browser lockdown', 'Tab switches, loss of focus, leaving full-screen, copy and paste, developer tools and multiple monitors are all logged.'),
+        ('gauge', 'Explainable fraud score', 'A decision engine weighs events by severity, frequency and recency and checks correlations between them, so reviewers can see why a score is what it is.'),
+      ] %}
+      <div class="feat"><div class="ic"><i data-lucide="{{ icon }}"></i></div><h3>{{ title }}</h3><p>{{ text }}</p></div>
+      {% endfor %}
+    </div>
+  </section>
+  <section class="section" style="padding-top:0">
+    <h2 style="color:#fff;margin-bottom:18px">How an exam runs</h2>
+    <div class="steps">
+      <div class="step"><b style="color:#fff">System check</b><p>Camera, microphone, full-screen and network are tested before the exam starts.</p></div>
+      <div class="step"><b style="color:#fff">Identity + liveness</b><p>The student blinks and turns their head, then the start photo is matched against their registered face.</p></div>
+      <div class="step"><b style="color:#fff">Monitored exam</b><p>The AI watches face, objects, audio and browser activity. Proctors see live tiles and receive alerts.</p></div>
+      <div class="step"><b style="color:#fff">Review & report</b><p>Proctors review the timeline with evidence, confirm or dismiss events, record a verdict and export reports.</p></div>
+    </div>
+  </section>
+</div>
+{% endblock %}

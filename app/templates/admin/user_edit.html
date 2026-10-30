@@ -1,0 +1,54 @@
+{% extends "layout.html" %}
+{% from "partials/capture.html" import face_capture %}
+{% from "partials/macros.html" import status_badge, score_ring %}
+{% block title %}{{ user.name if user.id else 'New user' }}{% endblock %}
+{% block crumbs %}Administration / Users / {{ user.name if user.id else 'New' }}{% endblock %}
+{% block content %}
+<div class="page-head"><div><h1>{{ user.name if user.id else 'Add user' }}</h1><p>{{ user.email if user.id else 'Create a student, proctor or administrator account.' }}</p></div>
+  <a class="btn" href="{{ url_for('admin.users') }}"><i data-lucide="arrow-left"></i> Users</a></div>
+<div class="grid g-2">
+  <form method="post" class="card" id="user-form">
+    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"><input type="hidden" name="action" value="save">
+    <div class="card-head"><h3><i data-lucide="id-card"></i> Account</h3>{% if user.id %}{% if user.is_active %}<span class="badge badge-green">Active</span>{% else %}<span class="badge">Inactive</span>{% endif %}{% endif %}</div>
+    <div class="card-body">
+      <div class="field"><label>Full name</label><input class="input" name="name" value="{{ form.get('name', user.name or '') }}" required></div>
+      <div class="field"><label>Email</label><input class="input" type="email" name="email" value="{{ form.get('email', user.email or '') }}" required></div>
+      <div class="grid g-2" style="gap:12px">
+        <div class="field"><label>Role</label><select class="input" name="role">{% for r in user.ROLES %}<option value="{{ r }}" {{ 'selected' if form.get('role', user.role) == r }}>{{ r|capitalize }}</option>{% endfor %}</select></div>
+        <div class="field"><label>Student / staff ID</label><input class="input" name="student_code" value="{{ form.get('student_code', user.student_code or '') }}"></div>
+      </div>
+      <div class="field"><label>Department</label><input class="input" name="department" value="{{ form.get('department', user.department or '') }}"></div>
+      <div class="field"><label>{{ 'Set a new password' if user.id else 'Initial password' }}</label><input class="input" type="password" name="password" autocomplete="new-password" placeholder="{{ 'Leave blank to keep the current one' if user.id else 'At least 8 characters' }}"></div>
+      {% if not user.id %}<div class="label mb-1">Face ID photo (optional)</div>{{ face_capture('photo') }}{% endif %}
+    </div>
+    <div class="card-foot"><button class="btn btn-primary"><i data-lucide="save"></i> Save</button></div>
+  </form>
+  {% if user.id %}
+  <div class="stack">
+    <form method="post" class="card">
+      <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"><input type="hidden" name="action" value="photo">
+      <div class="card-head"><h3><i data-lucide="scan-face"></i> Face ID</h3>{% if user.face_embedding_raw %}<span class="badge badge-green">Enrolled · {{ user.face_backend }}</span>{% else %}<span class="badge badge-amber">Not enrolled</span>{% endif %}</div>
+      <div class="card-body">{{ face_capture('photo', existing=url_for('main.media', rel=user.photo_path) if user.photo_path else None, note='Capture the student in person (for example at the exam centre) to enrol or replace their face template.') }}</div>
+      <div class="card-foot"><button class="btn btn-primary" id="save-photo" disabled>Save face photo</button></div>
+    </form>
+    <div class="card">
+      <div class="card-head"><h3><i data-lucide="settings-2"></i> Actions</h3></div>
+      <div class="card-body row wrap">
+        <form method="post"><input type="hidden" name="csrf_token" value="{{ csrf_token() }}"><input type="hidden" name="action" value="reset"><button class="btn" data-confirm="Generate a temporary password?"><i data-lucide="key-round"></i> Reset password</button></form>
+        <form method="post"><input type="hidden" name="csrf_token" value="{{ csrf_token() }}"><input type="hidden" name="action" value="toggle"><button class="btn">{% if user.is_active %}<i data-lucide="user-x"></i> Deactivate{% else %}<i data-lucide="user-check"></i> Activate{% endif %}</button></form>
+        {% if user.face_embedding_raw %}<form method="post"><input type="hidden" name="csrf_token" value="{{ csrf_token() }}"><input type="hidden" name="action" value="clear_face"><button class="btn" data-confirm="Remove this user's face template?"><i data-lucide="eraser"></i> Remove face ID</button></form>{% endif %}
+        {% if user.id != current_user.id %}<form method="post" action="{{ url_for('admin.user_delete', user_id=user.id) }}"><input type="hidden" name="csrf_token" value="{{ csrf_token() }}"><button class="btn btn-danger" data-confirm="Delete {{ user.name }}?" data-confirm-body="Users with exam records are deactivated instead."><i data-lucide="trash-2"></i> Delete</button></form>{% endif %}
+      </div>
+    </div>
+    {% if history %}
+    <div class="card table-wrap"><div class="card-head"><h3><i data-lucide="history"></i> Exam history</h3></div>
+      <table class="table"><tbody>{% for s in history %}<tr><td><div class="strong small">{{ s.exam.title }}</div><small class="muted">{{ s.started_at|dt }}</small></td><td>{{ status_badge(s) }}</td><td>{{ score_ring(s.peak_score, s.risk_level, 'sm') }}</td><td class="num"><a class="btn btn-sm" href="{{ url_for('proctor.session_detail', session_id=s.id) }}">Open</a></td></tr>{% endfor %}</tbody></table></div>
+    {% endif %}
+  </div>
+  {% endif %}
+</div>
+{% endblock %}
+{% block scripts %}
+<script src="{{ url_for('static', filename='js/capture.js') }}"></script>
+<script>document.addEventListener('captured', (e) => { const b = document.getElementById('save-photo'); if (b && e.target.closest('form') === b.closest('form')) b.disabled = false; });</script>
+{% endblock %}

@@ -1,0 +1,24 @@
+{% extends "layout.html" %}
+{% block title %}Awaiting approval{% endblock %}
+{% block crumbs %}My exams / {{ s.exam.title }}{% endblock %}
+{% block content %}
+<div style="display:grid;place-items:center;min-height:60vh">
+  <div class="card card-pad center" style="max-width:520px">
+    <div class="status-icon warn" style="width:64px;height:64px;margin:0 auto;border-radius:18px"><i data-lucide="user-search" style="width:30px;height:30px"></i></div>
+    <h2 class="mt-2">Waiting for proctor approval</h2>
+    <p class="muted mt-1">We could not verify your identity automatically. A proctor is comparing your start photo with your registered photo. Your exam timer starts as soon as you are approved.</p>
+    {% if s.reference_photo %}<img src="{{ url_for('main.media', rel=s.reference_photo) }}" alt="Your start photo" style="width:220px;border-radius:14px;margin:12px auto;display:block;transform:scaleX(-1)">{% endif %}
+    <div class="badge badge-amber pulse mt-1"><span class="dot"></span> Checking every few seconds…</div>
+  </div>
+</div>
+{% endblock %}
+{% block scripts %}
+<script>
+setInterval(async () => {
+  try {
+    const r = await App.api("{{ url_for('api.session_status', session_id=s.id) }}");
+    if (r.status !== 'pending_approval') location.href = r.redirect;
+  } catch (e) { /* retry */ }
+}, 4000);
+</script>
+{% endblock %}

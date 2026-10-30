@@ -1,0 +1,11 @@
+instance/
+models/*.onnx
+*.pt
+__pycache__/
+*.pyc
+.venv/
+venv/
+.env
+.pytest_cache/
+app/static/vendor/tasks-vision/
+app/static/vendor/mediapipe-models/

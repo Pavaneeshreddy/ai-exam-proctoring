@@ -1,0 +1,37 @@
+{% extends "layout.html" %}
+{% from "partials/macros.html" import risk_badge, score_ring, person, status_badge, verdict_badge %}
+{% block title %}Review sessions{% endblock %}
+{% block crumbs %}Proctoring / Review{% endblock %}
+{% block content %}
+<div class="page-head"><div><h1>Review sessions</h1><p>Filter attempts by exam, risk and verdict. Open a session to see its evidence timeline.</p></div></div>
+<form class="toolbar" method="get">
+  <input class="input" name="q" value="{{ f.q }}" placeholder="Search student, email, ID…">
+  <select class="input" name="exam_id"><option value="">All exams</option>{% for e in exams %}<option value="{{ e.id }}" {{ 'selected' if f.exam_id == e.id|string }}>{{ e.title }}</option>{% endfor %}</select>
+  <select class="input" name="risk"><option value="">Any risk</option>{% for r in ['low','medium','high','critical'] %}<option value="{{ r }}" {{ 'selected' if f.risk == r }}>{{ r|capitalize }}</option>{% endfor %}</select>
+  <select class="input" name="status"><option value="">Any status</option>{% for k, v in statuses.items() %}<option value="{{ k }}" {{ 'selected' if f.status == k }}>{{ v }}</option>{% endfor %}</select>
+  <select class="input" name="verdict"><option value="">Any verdict</option><option value="none" {{ 'selected' if f.verdict == 'none' }}>Not reviewed</option><option value="cleared" {{ 'selected' if f.verdict == 'cleared' }}>Cleared</option><option value="suspicious" {{ 'selected' if f.verdict == 'suspicious' }}>Suspicious</option><option value="malpractice" {{ 'selected' if f.verdict == 'malpractice' }}>Malpractice</option></select>
+  <button class="btn btn-primary"><i data-lucide="filter"></i> Apply</button>
+  {% if f.values()|select|list %}<a class="btn btn-ghost" href="{{ url_for('proctor.sessions') }}">Clear</a>{% endif %}
+</form>
+<div class="card table-wrap">
+  {% if rows %}
+  <table class="table">
+    <thead><tr><th>Candidate</th><th>Exam</th><th>Started</th><th>Status</th><th>Fraud score</th><th>Risk</th><th class="num">Events</th><th class="num">Result</th><th>Verdict</th><th></th></tr></thead>
+    <tbody>{% for s in rows %}
+      <tr>
+        <td>{{ person(s.student) }}</td>
+        <td class="small">{{ s.exam.title }}</td>
+        <td class="small">{{ s.started_at|dt }}</td>
+        <td>{{ status_badge(s) }}</td>
+        <td><div class="row">{{ score_ring(s.fraud_score, s.risk_level, 'sm') }}<span class="tiny muted">peak {{ s.peak_score|round|int }}</span></div></td>
+        <td>{{ risk_badge(s.risk_level) }}</td>
+        <td class="num">{{ s.events|length }}</td>
+        <td class="num">{% if s.needs_manual_grading %}<a class="badge badge-amber" href="{{ url_for('proctor.grade', session_id=s.id) }}">Grade</a>{% elif s.percent is not none %}{{ s.percent }}%{% else %}—{% endif %}</td>
+        <td>{{ verdict_badge(s.verdict) }}</td>
+        <td class="num"><a class="btn btn-sm" href="{{ url_for('proctor.session_detail', session_id=s.id) }}">Open</a></td>
+      </tr>
+    {% endfor %}</tbody>
+  </table>
+  {% else %}<div class="empty"><i data-lucide="search-x"></i><div>No sessions match these filters.</div></div>{% endif %}
+</div>
+{% endblock %}

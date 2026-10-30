@@ -1,0 +1,57 @@
+{% extends "layout.html" %}
+{% block title %}Overview{% endblock %}
+{% block crumbs %}Administration / Overview{% endblock %}
+{% block content %}
+<div class="page-head">
+  <div><h1>Institution overview</h1><p>Exam activity, AI detections and integrity outcomes across the platform.</p></div>
+  <div class="page-actions"><a class="btn" href="{{ url_for('admin.user_edit') }}"><i data-lucide="user-plus"></i> Add user</a><a class="btn btn-primary" href="{{ url_for('proctor.live') }}"><i data-lucide="monitor-play"></i> Live monitor</a></div>
+</div>
+<div class="grid g-4 mb-2">
+  <div class="card stat"><div class="icon"><i data-lucide="graduation-cap"></i></div><div><div class="value">{{ stats.students }}</div><div class="label">Students · {{ stats.proctors }} proctors</div></div></div>
+  <div class="card stat"><div class="icon blue"><i data-lucide="file-text"></i></div><div><div class="value">{{ stats.exams }}</div><div class="label">Exams · {{ stats.published }} published</div></div></div>
+  <div class="card stat"><div class="icon green"><i data-lucide="radio"></i></div><div><div class="value">{{ stats.live }}</div><div class="label">Writing now · {{ stats.sessions }} total sessions</div></div></div>
+  <div class="card stat"><div class="icon red"><i data-lucide="shield-alert"></i></div><div><div class="value">{{ stats.flagged }}</div><div class="label">Flagged sessions · {{ stats.malpractice }} malpractice</div></div></div>
+</div>
+<div class="grid g-main mb-2">
+  <div class="card"><div class="card-head"><h3><i data-lucide="line-chart"></i> Sessions, last 14 days</h3></div><div class="card-body"><div style="height:260px"><canvas id="c-days"></canvas></div></div></div>
+  <div class="card"><div class="card-head"><h3><i data-lucide="pie-chart"></i> Current risk distribution</h3></div><div class="card-body"><div style="height:260px"><canvas id="c-risk"></canvas></div></div></div>
+</div>
+<div class="grid g-2 mb-2">
+  <div class="card"><div class="card-head"><h3><i data-lucide="bar-chart-3"></i> Top AI detections</h3><span class="small muted">{{ stats.events }} events total</span></div><div class="card-body"><div style="height:300px"><canvas id="c-events"></canvas></div></div></div>
+  <div class="card"><div class="card-head"><h3><i data-lucide="radar"></i> Detections by modality</h3></div><div class="card-body"><div style="height:300px"><canvas id="c-cat"></canvas></div></div></div>
+</div>
+<div class="grid g-main">
+  <div class="card table-wrap">
+    <div class="card-head"><h3><i data-lucide="file-text"></i> Recent exams</h3><a class="btn btn-sm" href="{{ url_for('proctor.exams') }}">All exams</a></div>
+    <table class="table"><thead><tr><th>Exam</th><th>Status</th><th class="num">Attempts</th><th class="num">Flagged</th><th class="num">Avg peak fraud</th><th></th></tr></thead>
+      <tbody>{% for r in exam_rows %}<tr><td><div class="strong">{{ r.exam.title }}</div><small class="muted">{{ r.exam.subject or '' }}</small></td><td><span class="badge">{{ r.exam.availability()|capitalize }}</span></td><td class="num">{{ r.attempts }}</td><td class="num">{{ r.flagged }}</td><td class="num">{{ r.avg_fraud }}</td><td class="num"><a class="btn btn-sm" href="{{ url_for('proctor.exam_report', exam_id=r.exam.id) }}">Results</a></td></tr>{% else %}<tr><td colspan="6" class="empty">No exams.</td></tr>{% endfor %}</tbody></table>
+  </div>
+  <div class="card">
+    <div class="card-head"><h3><i data-lucide="scroll-text"></i> Recent activity</h3><a class="btn btn-sm" href="{{ url_for('admin.audit_log') }}">Audit log</a></div>
+    {% for a in recent %}<div class="alert-item"><div style="min-width:0"><div class="small strong">{{ a.action.replace('_',' ')|capitalize }}</div><div class="tiny muted">{{ a.user.name if a.user else 'System' }} · {{ a.target or '' }} · {{ a.created_at|ago }}</div></div></div>{% else %}<div class="empty small">No activity yet.</div>{% endfor %}
+  </div>
+</div>
+{% endblock %}
+{% block scripts %}
+<script src="{{ url_for('static', filename='vendor/chart-4.4.1.umd.min.js') }}"></script>
+<script>
+(function () {
+  const d = {{ charts|tojson }};
+  if (!window.Chart) return;
+  const css = getComputedStyle(document.documentElement);
+  const text = css.getPropertyValue('--text-3').trim(), grid = css.getPropertyValue('--border').trim();
+  Chart.defaults.color = text; Chart.defaults.font.family = 'Inter, system-ui, sans-serif';
+  const axes = { x: { grid: { color: grid } }, y: { beginAtZero: true, grid: { color: grid }, ticks: { precision: 0 } } };
+  new Chart(document.getElementById('c-days'), { type: 'bar', data: { labels: d.days, datasets: [
+    { label: 'Sessions', data: d.sessions, backgroundColor: '#6366f1', borderRadius: 6 },
+    { label: 'Flagged', data: d.flagged, backgroundColor: '#f97316', borderRadius: 6 }] },
+    options: { maintainAspectRatio: false, scales: axes, plugins: { legend: { position: 'bottom' } } } });
+  new Chart(document.getElementById('c-risk'), { type: 'doughnut', data: { labels: ['Low', 'Medium', 'High', 'Critical'], datasets: [{ data: d.risk, backgroundColor: ['#10b981', '#f59e0b', '#f97316', '#ef4444'], borderWidth: 0 }] },
+    options: { maintainAspectRatio: false, cutout: '68%', plugins: { legend: { position: 'bottom' } } } });
+  new Chart(document.getElementById('c-events'), { type: 'bar', data: { labels: d.events.labels, datasets: [{ data: d.events.values, backgroundColor: '#818cf8', borderRadius: 6 }] },
+    options: { indexAxis: 'y', maintainAspectRatio: false, plugins: { legend: { display: false } }, scales: { x: { beginAtZero: true, grid: { color: grid }, ticks: { precision: 0 } }, y: { grid: { display: false } } } } });
+  new Chart(document.getElementById('c-cat'), { type: 'polarArea', data: { labels: d.categories.labels.map((s) => s[0].toUpperCase() + s.slice(1)), datasets: [{ data: d.categories.values, backgroundColor: ['#6366f1cc', '#a855f7cc', '#ec4899cc', '#f97316cc', '#10b981cc', '#0ea5e9cc', '#f59e0bcc', '#64748bcc', '#ef4444cc'] }] },
+    options: { maintainAspectRatio: false, scales: { r: { grid: { color: grid }, ticks: { display: false } } }, plugins: { legend: { position: 'right' } } } });
+})();
+</script>
+{% endblock %}

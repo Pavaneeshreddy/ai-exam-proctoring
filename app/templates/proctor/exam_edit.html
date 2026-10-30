@@ -1,0 +1,102 @@
+{% extends "layout.html" %}
+{% block title %}{{ 'Edit' if exam.id else 'New' }} exam{% endblock %}
+{% block crumbs %}Exams / {{ exam.title if exam.id else 'New exam' }}{% endblock %}
+{% macro toggle(name, title, desc) -%}
+<label class="check"><input type="checkbox" name="{{ name }}" {{ 'checked' if exam[name] }}><div><strong>{{ title }}</strong><span>{{ desc }}</span></div></label>
+{%- endmacro %}
+{% block content %}
+<form method="post" id="exam-form">
+  <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+  <input type="hidden" name="questions_json" id="questions_json">
+  <div class="page-head">
+    <div><h1>{{ exam.title if exam.id else 'Create exam' }}</h1><p>Set up the details, the AI proctoring policy and the questions.</p></div>
+    <div class="page-actions">
+      {% if exam.id %}<a class="btn" href="{{ url_for('proctor.exam_report', exam_id=exam.id) }}"><i data-lucide="bar-chart-3"></i> Results</a>{% endif %}
+      <button class="btn btn-primary"><i data-lucide="save"></i> Save exam</button>
+    </div>
+  </div>
+  <div class="tabs" id="tabs"><button type="button" class="active" data-tab="details">Details</button><button type="button" data-tab="proctoring">AI proctoring</button><button type="button" data-tab="questions">Questions <span class="badge" id="q-count">0</span></button></div>
+
+  <section data-tabpanel="details" class="grid g-main">
+    <div class="card card-pad">
+      <div class="field"><label>Title</label><input class="input" name="title" value="{{ exam.title or '' }}" required placeholder="e.g. Machine Learning — Midterm"></div>
+      <div class="grid g-2" style="gap:12px">
+        <div class="field"><label>Subject / course</label><input class="input" name="subject" value="{{ exam.subject or '' }}"></div>
+        <div class="field"><label>Mode</label><select class="input" name="mode">{% for k, v in exam.MODES.items() %}<option value="{{ k }}" {{ 'selected' if (exam.mode or 'online') == k }}>{{ v }}</option>{% endfor %}</select><span class="hint">Written mode: students answer on paper under camera supervision and upload photos of their sheets.</span></div>
+      </div>
+      <div class="field"><label>Description</label><textarea class="input" name="description" rows="2">{{ exam.description or '' }}</textarea></div>
+      <div class="field"><label>Instructions shown before the exam</label><textarea class="input" name="instructions" rows="4">{{ exam.instructions or '' }}</textarea></div>
+    </div>
+    <div class="card card-pad">
+      <div class="field"><label>Status</label><select class="input" name="status">{% for st in ['draft','published','archived'] %}<option value="{{ st }}" {{ 'selected' if (exam.status or 'draft') == st }}>{{ st|capitalize }}</option>{% endfor %}</select></div>
+      <div class="grid g-2" style="gap:12px">
+        <div class="field"><label>Duration (min)</label><input class="input" type="number" min="1" name="duration_minutes" value="{{ exam.duration_minutes or 60 }}"></div>
+        <div class="field"><label>Pass mark (%)</label><input class="input" type="number" min="0" max="100" name="pass_percent" value="{{ exam.pass_percent if exam.pass_percent is not none else 40 }}"></div>
+      </div>
+      <div class="field"><label>Opens (UTC)</label><input class="input" type="datetime-local" name="start_at" value="{{ exam.start_at.strftime('%Y-%m-%dT%H:%M') if exam.start_at }}"></div>
+      <div class="field"><label>Closes (UTC)</label><input class="input" type="datetime-local" name="end_at" value="{{ exam.end_at.strftime('%Y-%m-%dT%H:%M') if exam.end_at }}"></div>
+      <div class="grid g-2" style="gap:12px">
+        <div class="field"><label>Attempts allowed</label><input class="input" type="number" min="1" name="max_attempts" value="{{ exam.max_attempts or 1 }}"></div>
+        <div class="field"><label>Access code</label><input class="input" name="access_code" value="{{ exam.access_code or '' }}" placeholder="optional"></div>
+      </div>
+      <div class="stack" style="gap:8px">
+        {{ toggle('shuffle_questions', 'Shuffle questions', 'Each student gets a different order.') }}
+        {{ toggle('shuffle_options', 'Shuffle options', 'Randomise choice order for MCQs.') }}
+        {{ toggle('show_results', 'Show results to students', 'Score and answer review after submission.') }}
+      </div>
+      {% if proctors %}<div class="field mt-2"><label>Assigned proctors</label>
+        <div class="stack" style="gap:6px">{% for p in proctors %}<label class="row small"><input type="checkbox" name="proctors" value="{{ p.id }}" {{ 'checked' if p in exam.proctors }} style="accent-color:var(--primary)"> {{ p.name }} <span class="muted">{{ p.email }}</span></label>{% endfor %}</div></div>{% endif %}
+    </div>
+  </section>
+
+  <section data-tabpanel="proctoring" hidden>
+    <div class="grid g-2">
+      <div class="card card-pad">
+        <h3 class="mb-1">Monitoring</h3>
+        <div class="stack" style="gap:8px">
+          {{ toggle('require_identity', 'Face verification', 'Match the start photo to the registered face. If it fails, a proctor must approve the student.') }}
+          {{ toggle('require_liveness', 'Liveness challenge', 'Blink, turn or smile on request so a printed photo cannot pass.') }}
+          {{ toggle('monitor_audio', 'Audio monitoring', 'Voice-activity and multiple-speaker detection. Raw audio is never uploaded.') }}
+          {{ toggle('monitor_objects', 'Object detection', 'YOLOv8 / EfficientDet: phones, books, extra screens, extra people.') }}
+          {{ toggle('enforce_fullscreen', 'Enforce full-screen', 'Block the exam until the student returns to full-screen.') }}
+        </div>
+        <p class="small muted mt-2 mb-0">Always on: continuous same-person verification, face presence, head pose, gaze, tab switching, focus loss, clipboard, shortcuts, developer tools and multiple monitors.</p>
+      </div>
+      <div class="card card-pad">
+        <h3 class="mb-1">Fraud score policy</h3>
+        <div class="field"><label>Warning threshold: <b id="warn-v">{{ exam.warn_threshold or 40 }}</b></label><input type="range" min="5" max="95" name="warn_threshold" value="{{ exam.warn_threshold or 40 }}" oninput="document.getElementById('warn-v').textContent=this.value"><span class="hint">At this score the session is marked high risk, the student is warned and proctors are alerted.</span></div>
+        <div class="field"><label>Critical threshold: <b id="crit-v">{{ exam.critical_threshold or 75 }}</b></label><input type="range" min="10" max="100" name="critical_threshold" value="{{ exam.critical_threshold or 75 }}" oninput="document.getElementById('crit-v').textContent=this.value"></div>
+        {{ toggle('auto_terminate', 'Auto-terminate at critical threshold', 'End the exam automatically when the score reaches the critical level. Otherwise a proctor decides.') }}
+        <div class="callout mt-2"><i data-lucide="info"></i><div class="small">The score (0–100) combines event severity, how often an event repeats, how recent it is and the detector's confidence. It also adds correlated patterns, for example looking away while speech is detected. Admins can tune the weights under <b>AI engine</b>.</div></div>
+      </div>
+    </div>
+  </section>
+
+  <section data-tabpanel="questions" hidden>
+    <div class="row between mb-2 wrap">
+      <div class="row wrap">
+        <button type="button" class="btn" data-add="mcq"><i data-lucide="circle-dot"></i> Single choice</button>
+        <button type="button" class="btn" data-add="multi"><i data-lucide="list-checks"></i> Multiple choice</button>
+        <button type="button" class="btn" data-add="truefalse"><i data-lucide="toggle-left"></i> True / False</button>
+        <button type="button" class="btn" data-add="short"><i data-lucide="text-cursor-input"></i> Short answer</button>
+        <button type="button" class="btn" data-add="essay"><i data-lucide="align-left"></i> Essay</button>
+      </div>
+      <span class="small muted">Total marks: <b id="total-marks">0</b></span>
+    </div>
+    <div id="q-list"></div>
+    <div class="card empty" id="q-empty" hidden><i data-lucide="list-plus"></i><div>No questions yet. Add one above{% if exam.id %} or import a CSV{% endif %}.</div></div>
+  </section>
+</form>
+
+{% if exam.id %}
+<form method="post" enctype="multipart/form-data" action="{{ url_for('proctor.exam_import', exam_id=exam.id) }}" class="card card-pad mt-2" data-tabpanel-extra="questions" hidden>
+  <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+  <div class="row between wrap"><div><h3>Import questions from CSV</h3><p class="small muted mb-0">Columns: <code>type,text,options,answer,marks</code>. Options are separated by <code>|</code>. The answer is an option letter or number (<code>B</code>, <code>2</code>), <code>A|C</code> for multiple choice, <code>true</code>/<code>false</code>, or accepted short answers separated by <code>|</code>. Save the exam first, because importing reloads the page.</p></div>
+    <div class="row"><input type="file" name="file" accept=".csv" class="input" style="width:auto"><button class="btn"><i data-lucide="upload"></i> Import</button></div></div>
+</form>
+{% endif %}
+{% endblock %}
+{% block scripts %}
+<script>window.QUESTIONS_INIT = JSON.parse({{ questions_json|tojson }});</script>
+<script src="{{ url_for('static', filename='js/exam-editor.js') }}"></script>
+{% endblock %}

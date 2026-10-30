@@ -1,0 +1,12 @@
+{% extends "base.html" %}
+{% block title %}{{ title }}{% endblock %}
+{% block body %}
+<div style="min-height:100vh;display:grid;place-items:center;padding:24px">
+  <div class="card card-pad center" style="max-width:440px">
+    <div style="font-size:64px;font-weight:800;letter-spacing:-.04em;color:var(--primary)">{{ code }}</div>
+    <h2 class="mb-1">{{ title }}</h2>
+    <p class="muted">{% if code == 403 %}You don't have permission to view this page.{% elif code == 404 %}The page you were looking for doesn't exist.{% else %}Please try again in a moment.{% endif %}</p>
+    <a class="btn btn-primary mt-1" href="{{ url_for('main.index') }}"><i data-lucide="home"></i> Go home</a>
+  </div>
+</div>
+{% endblock %}

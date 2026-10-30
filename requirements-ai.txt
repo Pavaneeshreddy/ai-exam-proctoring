@@ -1,0 +1,5 @@
+# Optional heavy AI stack for server-side YOLOv8 (pulls in PyTorch).
+-r requirements.txt
+ultralytics>=8.2
+# Optional alternative face recogniser (needs dlib build tools):
+# face_recognition>=1.3

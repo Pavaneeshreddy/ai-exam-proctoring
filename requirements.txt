@@ -1,0 +1,10 @@
+Flask>=3.0,<4
+Flask-SQLAlchemy>=3.1,<4
+Flask-Login>=0.6,<1
+Flask-WTF>=1.2,<2
+numpy>=1.26
+# 4.x ships the Haar cascades used by the fallback face detector
+opencv-python-headless>=4.9,<5
+# MySQL driver (only needed when DATABASE_URL points at MySQL)
+PyMySQL>=1.1
+cryptography>=42

@@ -1,0 +1,67 @@
+{% extends "layout.html" %}
+{% block title %}Result · {{ s.exam.title }}{% endblock %}
+{% block crumbs %}My exams / {{ s.exam.title }} / Result{% endblock %}
+{% block content %}
+<div class="page-head"><div><h1>{{ s.exam.title }}</h1><p>Submitted {{ s.submitted_at|dt }} · {{ s.status_label }}</p></div>
+  <a class="btn" href="{{ url_for('student.dashboard') }}"><i data-lucide="arrow-left"></i> My exams</a></div>
+
+{% if s.status == 'terminated' %}
+<div class="callout danger mb-2"><i data-lucide="octagon-x"></i><div><b>This exam was terminated.</b><br>{{ s.terminated_reason or 'The proctor ended your session.' }} If you think this is a mistake, contact your examiner; every decision is reviewed by a person.</div></div>
+{% endif %}
+
+<div class="grid g-3 mb-2">
+  <div class="card card-pad center">
+    {% if s.exam.show_results and s.percent is not none and not s.needs_manual_grading %}
+      <div class="small muted">Your score</div>
+      <div style="font-size:44px;font-weight:800;letter-spacing:-.03em">{{ s.percent }}%</div>
+      <div class="muted">{{ s.score|round(2) }} / {{ s.max_score|round(2) }} marks</div>
+      <div class="mt-1">{% if s.passed %}<span class="badge badge-green">Passed</span>{% else %}<span class="badge badge-red">Below pass mark ({{ s.exam.pass_percent }}%)</span>{% endif %}</div>
+    {% elif s.needs_manual_grading %}
+      <div class="status-icon warn" style="margin:0 auto;width:52px;height:52px"><i data-lucide="hourglass"></i></div>
+      <h3 class="mt-1">Awaiting grading</h3><p class="small muted mb-0">Some answers are being graded by your examiner.</p>
+    {% else %}
+      <div class="status-icon ok" style="margin:0 auto;width:52px;height:52px"><i data-lucide="check"></i></div>
+      <h3 class="mt-1">Submitted</h3><p class="small muted mb-0">Results will be published by your examiner.</p>
+    {% endif %}
+  </div>
+  <div class="card card-pad">
+    <div class="small muted mb-1">Session</div>
+    <dl class="kv" style="grid-template-columns:110px 1fr">
+      <dt>Started</dt><dd>{{ s.started_at|dt }}</dd>
+      <dt>Submitted</dt><dd>{{ s.submitted_at|dt }}</dd>
+      <dt>Time used</dt><dd>{{ ((s.submitted_at - s.started_at).total_seconds())|duration if s.submitted_at else '—' }}</dd>
+      <dt>Identity</dt><dd>{{ 'Verified' if s.identity_verified else 'Approved by proctor' }}</dd>
+    </dl>
+  </div>
+  <div class="card card-pad">
+    <div class="small muted mb-1">Start photo</div>
+    {% if s.reference_photo %}<img src="{{ url_for('main.media', rel=s.reference_photo) }}" alt="Start photo" style="border-radius:10px;width:100%;aspect-ratio:4/3;object-fit:cover;transform:scaleX(-1)">{% endif %}
+  </div>
+</div>
+
+{% if rows %}
+<div class="card">
+  <div class="card-head"><h3><i data-lucide="list-checks"></i> Answer review</h3></div>
+  <div class="table-wrap"><table class="table">
+    <thead><tr><th>#</th><th>Question</th><th>Your answer</th><th>Correct answer</th><th class="num">Marks</th></tr></thead>
+    <tbody>
+    {% for r in rows %}{% set q = r.q %}{% set a = r.a %}
+      <tr>
+        <td>{{ loop.index }}</td>
+        <td style="max-width:380px">{{ q.text }}</td>
+        <td>{% if a and a.response is not none and a.response != '' %}
+              {% if q.qtype == 'mcq' %}{{ q.options[a.response|int] if (a.response|int) < q.options|length else a.response }}
+              {% elif q.qtype == 'multi' %}{% for i in a.response %}{{ q.options[i] }}{{ ', ' if not loop.last }}{% endfor %}
+              {% elif q.qtype == 'truefalse' %}{{ 'True' if a.response in (true, 'true', 'True') else 'False' }}
+              {% else %}<span style="white-space:pre-wrap">{{ a.response|truncate(200) }}</span>{% endif %}
+            {% else %}<span class="muted">No answer</span>{% endif %}</td>
+        <td class="small">{% if q.qtype == 'mcq' %}{{ q.options[q.answer] }}{% elif q.qtype == 'multi' %}{% for i in q.answer %}{{ q.options[i] }}{{ ', ' if not loop.last }}{% endfor %}{% elif q.qtype == 'truefalse' %}{{ 'True' if q.answer else 'False' }}{% elif q.qtype == 'short' %}{{ q.answer|join(' / ') }}{% else %}<span class="muted">Graded manually</span>{% endif %}
+          {% if a and a.feedback %}<div class="muted tiny mt-1">Feedback: {{ a.feedback }}</div>{% endif %}</td>
+        <td class="num">{% if a and a.marks_awarded is not none %}<span class="badge {{ 'badge-green' if a.marks_awarded >= q.marks else ('badge-amber' if a.marks_awarded > 0 else 'badge-red') }}">{{ a.marks_awarded|round(2) }} / {{ q.marks|round(1) }}</span>{% else %}—{% endif %}</td>
+      </tr>
+    {% endfor %}
+    </tbody>
+  </table></div>
+</div>
+{% endif %}
+{% endblock %}

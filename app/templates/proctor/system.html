@@ -1,0 +1,27 @@
+{% extends "layout.html" %}
+{% block title %}AI system status{% endblock %}
+{% block crumbs %}Exams / AI system status{% endblock %}
+{% block content %}
+<div class="page-head"><div><h1>AI system status</h1><p>Which models are active on this server and in candidates' browsers.</p></div></div>
+<div class="grid g-2">
+  <div class="card">
+    <div class="card-head"><h3><i data-lucide="server"></i> Server-side AI (authoritative)</h3></div>
+    <ul class="check-list card-body">
+      <li><div class="status-icon {{ 'ok' if face_backend in ('sface','dlib') else 'warn' }}"><i data-lucide="scan-face"></i></div><div><div class="strong">Face detection & recognition</div><div class="small muted">Backend <b>{{ face_backend }}</b> · match threshold {{ face_threshold }}{% if face_backend == 'basic' %}. Fallback mode (Haar + LBP). Run <code>python scripts/download_models.py</code> to enable the YuNet + SFace deep models.{% endif %}</div></div></li>
+      <li><div class="status-icon {{ 'ok' if yolo else 'warn' }}"><i data-lucide="smartphone"></i></div><div><div class="strong">YOLOv8 object detection</div><div class="small muted">{% if yolo %}Active: phones, books, screens and persons are checked in every uploaded frame.{% else %}Not installed. Run <code>pip install -r requirements-ai.txt</code>. Detection in the browser is still active.{% endif %}</div></div></li>
+      <li><div class="status-icon ok"><i data-lucide="sun"></i></div><div><div class="strong">Camera quality analysis</div><div class="small muted">Detects a blocked lens and low light (OpenCV).</div></div></li>
+      <li><div class="status-icon ok"><i data-lucide="audio-lines"></i></div><div><div class="strong">Speaker analysis</div><div class="small muted">Classifies speech and multiple speakers from pitch clustering of audio summaries.</div></div></li>
+      <li><div class="status-icon ok"><i data-lucide="gauge"></i></div><div><div class="strong">Decision engine</div><div class="small muted">Scores events by severity, frequency, recency and confidence, with correlation rules.</div></div></li>
+    </ul>
+  </div>
+  <div class="card">
+    <div class="card-head"><h3><i data-lucide="laptop"></i> On-device AI (real time, in the browser)</h3></div>
+    <ul class="check-list card-body">
+      <li><div class="status-icon ok"><i data-lucide="eye"></i></div><div><div class="strong">MediaPipe Face Landmarker</div><div class="small muted">478 landmarks + blendshapes → face count, head yaw/pitch, eye gaze, blink and smile for liveness. About 6 fps.</div></div></li>
+      <li><div class="status-icon ok"><i data-lucide="box"></i></div><div><div class="strong">EfficientDet-Lite0 object detector</div><div class="small muted">COCO classes: cell phone, book, laptop, TV, person.</div></div></li>
+      <li><div class="status-icon ok"><i data-lucide="mic"></i></div><div><div class="strong">Voice-activity detection</div><div class="small muted">Noise-floor calibration + autocorrelation pitch tracking. Raw audio never leaves the device.</div></div></li>
+      <li><div class="status-icon ok"><i data-lucide="app-window"></i></div><div><div class="strong">Browser supervision</div><div class="small muted">Visibility, focus, full-screen, clipboard, shortcuts, developer tools, multiple monitors, network.</div></div></li>
+    </ul>
+  </div>
+</div>
+{% endblock %}

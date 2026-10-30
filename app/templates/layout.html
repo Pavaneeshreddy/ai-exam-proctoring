@@ -1,0 +1,58 @@
+{% extends "base.html" %}
+{% set endpoint = request.endpoint or '' %}
+{% macro nav_link(ep, icon, label, also=(), count=None) -%}
+  <a href="{{ url_for(ep) }}" class="{{ 'active' if endpoint == ep or endpoint in also }}">
+    <i data-lucide="{{ icon }}"></i><span>{{ label }}</span>{% if count %}<span class="count">{{ count }}</span>{% endif %}
+  </a>
+{%- endmacro %}
+{% block body %}
+<div class="shell">
+  <aside class="sidebar" id="sidebar">
+    <div class="brand"><div class="brand-mark"><i data-lucide="scan-face"></i></div><div>{{ app_name }}<small>Exam integrity</small></div></div>
+    <nav class="nav">
+      {% if current_user.role == 'admin' %}
+        <div class="nav-label">Administration</div>
+        {{ nav_link('admin.dashboard', 'layout-dashboard', 'Overview') }}
+        {{ nav_link('admin.users', 'users', 'Users', also=('admin.user_edit',)) }}
+        {{ nav_link('admin.settings', 'sliders-horizontal', 'AI engine') }}
+        {{ nav_link('admin.audit_log', 'scroll-text', 'Audit log') }}
+      {% endif %}
+      {% if current_user.is_staff %}
+        <div class="nav-label">Proctoring</div>
+        {{ nav_link('proctor.dashboard', 'shield-check', 'Proctor desk') }}
+        {{ nav_link('proctor.live', 'monitor-play', 'Live monitor') }}
+        {{ nav_link('proctor.sessions', 'clipboard-list', 'Review sessions', also=('proctor.session_detail','proctor.grade')) }}
+        <div class="nav-label">Exams</div>
+        {{ nav_link('proctor.exams', 'file-text', 'Exams', also=('proctor.exam_report',)) }}
+        {{ nav_link('proctor.exam_edit', 'file-plus-2', 'Create exam') }}
+        {{ nav_link('proctor.system', 'cpu', 'AI system status') }}
+      {% else %}
+        <div class="nav-label">Student</div>
+        {{ nav_link('student.dashboard', 'graduation-cap', 'My exams', also=('student.prepare','student.result')) }}
+      {% endif %}
+      <div class="nav-label">Account</div>
+      {{ nav_link('auth.profile', 'user-round', 'Profile & face ID') }}
+    </nav>
+    <div class="sidebar-foot">
+      <div class="user-chip">
+        {% if current_user.photo_path %}<img class="avatar" src="{{ url_for('main.media', rel=current_user.photo_path) }}" alt="">{% else %}<div class="avatar">{{ current_user.initials }}</div>{% endif %}
+        <div style="min-width:0"><div style="white-space:nowrap;overflow:hidden;text-overflow:ellipsis">{{ current_user.name }}</div><small>{{ current_user.role }}</small></div>
+      </div>
+      <form method="post" action="{{ url_for('auth.logout') }}">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+        <button class="btn btn-ghost btn-sm btn-block" style="color:var(--sidebar-text);justify-content:flex-start"><i data-lucide="log-out"></i> Sign out</button>
+      </form>
+    </div>
+  </aside>
+  <div class="main">
+    <header class="topbar">
+      <button class="btn btn-ghost icon-btn menu-btn" onclick="document.getElementById('sidebar').classList.toggle('open')" aria-label="Menu"><i data-lucide="menu"></i></button>
+      <div class="crumbs">{% block crumbs %}{% endblock %}</div>
+      <div class="spacer"></div>
+      {% block topbar_extra %}{% endblock %}
+      <button class="btn btn-ghost icon-btn" onclick="App.toggleTheme()" title="Toggle theme" aria-label="Toggle theme"><i data-lucide="sun-moon"></i></button>
+    </header>
+    <main class="content">{% block content %}{% endblock %}</main>
+  </div>
+</div>
+{% endblock %}

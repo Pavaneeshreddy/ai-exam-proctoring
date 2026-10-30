@@ -1,0 +1,63 @@
+{% extends "layout.html" %}
+{% from "partials/macros.html" import risk_badge, sev_badge, score_ring, person, status_badge %}
+{% block title %}Proctor desk{% endblock %}
+{% block crumbs %}Proctoring / Desk{% endblock %}
+{% block content %}
+<div class="page-head">
+  <div><h1>Proctor desk</h1><p>Live candidates, sessions that need a decision, and grading in one view.</p></div>
+  <div class="page-actions">
+    <a class="btn" href="{{ url_for('proctor.exam_edit') }}"><i data-lucide="file-plus-2"></i> New exam</a>
+    <a class="btn btn-primary" href="{{ url_for('proctor.live') }}"><i data-lucide="monitor-play"></i> Open live monitor</a>
+  </div>
+</div>
+<div class="grid g-4 mb-2">
+  <div class="card stat"><div class="icon blue"><i data-lucide="radio"></i></div><div><div class="value">{{ stats.live }}</div><div class="label">Writing now</div></div></div>
+  <div class="card stat"><div class="icon red"><i data-lucide="siren"></i></div><div><div class="value">{{ stats.flagged_live }}</div><div class="label">High-risk live sessions</div></div></div>
+  <div class="card stat"><div class="icon amber"><i data-lucide="user-search"></i></div><div><div class="value">{{ stats.pending }}</div><div class="label">Awaiting identity approval</div></div></div>
+  <div class="card stat"><div class="icon"><i data-lucide="pen-tool"></i></div><div><div class="value">{{ stats.to_grade }}</div><div class="label">Need manual grading</div></div></div>
+</div>
+
+<div class="grid g-main">
+  <div class="stack">
+    <div class="card">
+      <div class="card-head"><h3><i data-lucide="radio"></i> Live sessions</h3><a class="btn btn-sm" href="{{ url_for('proctor.live') }}">Monitor all</a></div>
+      {% if live %}
+      <div class="table-wrap"><table class="table">
+        <thead><tr><th>Candidate</th><th>Exam</th><th>Status</th><th>Risk</th><th class="num">Score</th><th></th></tr></thead>
+        <tbody>{% for s in live|sort(attribute='fraud_score', reverse=true) %}
+          <tr><td>{{ person(s.student) }}</td><td class="small">{{ s.exam.title }}</td><td>{{ status_badge(s) }}</td><td>{{ risk_badge(s.risk_level) }}</td><td class="num">{{ score_ring(s.fraud_score, s.risk_level, 'sm') }}</td>
+          <td class="num"><a class="btn btn-sm" href="{{ url_for('proctor.session_detail', session_id=s.id) }}">Open</a></td></tr>
+        {% endfor %}</tbody></table></div>
+      {% else %}<div class="empty"><i data-lucide="coffee"></i><div>No one is writing right now.</div></div>{% endif %}
+    </div>
+    <div class="card">
+      <div class="card-head"><h3><i data-lucide="gavel"></i> Needs a verdict</h3><a class="btn btn-sm" href="{{ url_for('proctor.sessions', verdict='none') }}">All unreviewed</a></div>
+      {% if to_review %}
+      <div class="table-wrap"><table class="table">
+        <thead><tr><th>Candidate</th><th>Exam</th><th>Peak risk</th><th class="num">Events</th><th></th></tr></thead>
+        <tbody>{% for s in to_review %}
+          <tr><td>{{ person(s.student) }}</td><td class="small">{{ s.exam.title }}<br><span class="muted">{{ s.submitted_at|dt }}</span></td>
+            <td>{{ score_ring(s.peak_score, s.risk_level, 'sm') }}</td><td class="num">{{ s.events|length }}</td>
+            <td class="num"><a class="btn btn-sm btn-primary" href="{{ url_for('proctor.session_detail', session_id=s.id) }}">Review</a></td></tr>
+        {% endfor %}</tbody></table></div>
+      {% else %}<div class="empty"><i data-lucide="badge-check"></i><div>Nothing is waiting for a verdict.</div></div>{% endif %}
+    </div>
+  </div>
+  <div class="stack">
+    <div class="card">
+      <div class="card-head"><h3><i data-lucide="bell-ring"></i> Recent alerts</h3></div>
+      {% for ev in alerts %}
+        <a class="alert-item {{ ev.severity }}" href="{{ url_for('proctor.session_detail', session_id=ev.session_id) }}"><span class="bar"></span>
+          <div style="min-width:0"><div class="strong small">{{ catalog_entry(ev.event_type).label }}</div><div class="tiny muted">{{ ev.session.student.name }} · {{ ev.created_at|ago }}</div></div>
+          <span style="margin-left:auto">{{ sev_badge(ev.severity) }}</span></a>
+      {% else %}<div class="empty"><i data-lucide="bell-off"></i><div>No high-severity alerts.</div></div>{% endfor %}
+    </div>
+    <div class="card">
+      <div class="card-head"><h3><i data-lucide="file-text"></i> Your exams</h3><a class="btn btn-sm" href="{{ url_for('proctor.exams') }}">All</a></div>
+      {% for e in exams %}
+        <a class="alert-item" href="{{ url_for('proctor.exam_report', exam_id=e.id) }}"><div style="min-width:0"><div class="strong small">{{ e.title }}</div><div class="tiny muted">{{ e.sessions|length }} attempts · {{ e.availability()|capitalize }}</div></div><i data-lucide="chevron-right" style="margin-left:auto"></i></a>
+      {% else %}<div class="empty">No exams yet.</div>{% endfor %}
+    </div>
+  </div>
+</div>
+{% endblock %}

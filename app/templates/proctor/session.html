@@ -1,0 +1,151 @@
+{% extends "layout.html" %}
+{% from "partials/macros.html" import risk_badge, sev_badge, score_ring, person, status_badge, verdict_badge %}
+{% block title %}{{ s.student.name }} · {{ s.exam.title }}{% endblock %}
+{% block crumbs %}Proctoring / Sessions / #{{ s.id }}{% endblock %}
+{% block content %}
+<div class="page-head">
+  <div class="row" style="gap:16px">
+    {% if s.student.photo_path %}<img class="avatar lg" src="{{ url_for('main.media', rel=s.student.photo_path) }}" alt="">{% else %}<div class="avatar lg">{{ s.student.initials }}</div>{% endif %}
+    <div>
+      <h1>{{ s.student.name }}</h1>
+      <p>{{ s.exam.title }} · {{ s.student.student_code or s.student.email }} · started {{ s.started_at|dt }}</p>
+      <div class="row wrap mt-1" id="head-badges">{{ status_badge(s) }} {{ risk_badge(s.risk_level) }} {{ verdict_badge(s.verdict) }}
+        {% if s.identity_verified %}<span class="badge badge-green"><i data-lucide="scan-face" style="width:13px;height:13px"></i> ID verified{% if s.identity_score is not none %} · {{ '%.2f'|format(s.identity_score) }}{% endif %}</span>{% else %}<span class="badge badge-amber">ID not verified</span>{% endif %}
+        {% if s.liveness_passed %}<span class="badge badge-green">Liveness ✓</span>{% elif s.liveness_passed == false %}<span class="badge badge-red">Liveness failed</span>{% endif %}
+      </div>
+    </div>
+  </div>
+  <div class="page-actions">
+    {% if s.status == 'pending_approval' %}<button class="btn btn-success" data-action="approve"><i data-lucide="user-check"></i> Approve identity</button>{% endif %}
+    {% if s.is_active %}
+      <button class="btn" data-action="message"><i data-lucide="message-square-warning"></i> Warn student</button>
+      <button class="btn" data-action="extend"><i data-lucide="timer-reset"></i> Extra time</button>
+      <button class="btn" data-action="flag"><i data-lucide="flag"></i> Flag</button>
+      <button class="btn btn-danger" data-action="terminate"><i data-lucide="octagon-x"></i> Terminate</button>
+    {% else %}
+      {% if s.needs_manual_grading or s.exam.mode == 'written' %}<a class="btn" href="{{ url_for('proctor.grade', session_id=s.id) }}"><i data-lucide="pen-tool"></i> Grade</a>{% endif %}
+      <a class="btn" href="{{ url_for('proctor.session_report', session_id=s.id) }}" target="_blank"><i data-lucide="file-down"></i> Report</a>
+    {% endif %}
+  </div>
+</div>
+
+{% if s.status == 'pending_approval' %}
+<div class="callout warn mb-2"><i data-lucide="user-search"></i><div><b>Identity check needs you.</b> Compare the start photo with the registered photo below. Approving starts the student's timer.</div></div>
+{% endif %}
+{% if s.terminated_reason %}<div class="callout danger mb-2"><i data-lucide="octagon-x"></i><div>{{ s.terminated_reason }}</div></div>{% endif %}
+
+<div class="grid g-main">
+  <div class="stack">
+    <div class="card">
+      <div class="card-head"><h3><i data-lucide="scan-face"></i> Identity continuity</h3><span class="small muted" id="id-sim">{% if s.last_identity_similarity is not none %}Latest similarity {{ '%.3f'|format(s.last_identity_similarity) }} (threshold {{ threshold }}, {{ backend }}){% else %}Model: {{ backend }} · threshold {{ threshold }}{% endif %}</span></div>
+      <div class="card-body">
+        <div class="compare" style="grid-template-columns:repeat(3,1fr)">
+          <figure><img src="{{ url_for('main.media', rel=s.student.photo_path) if s.student.photo_path else '' }}" alt="Registered" data-zoom><figcaption><span>Registered photo</span></figcaption></figure>
+          <figure><img src="{{ url_for('main.media', rel=s.reference_photo) if s.reference_photo else '' }}" alt="Start of exam" data-zoom><figcaption><span>Start of exam</span><span>{{ '%.2f'|format(s.identity_score) if s.identity_score is not none else '' }}</span></figcaption></figure>
+          <figure><img id="latest-frame" src="{{ url_for('main.media', rel='sessions/%d/latest.jpg' % s.id, t=(s.last_frame_at.timestamp()|int if s.last_frame_at else 0)) if s.last_frame_at else '' }}" alt="Latest frame" data-zoom><figcaption><span>{{ 'Live' if s.is_active else 'Last' }} frame</span><span id="latest-meta">{{ s.last_frame_at|ago if s.last_frame_at else 'none' }}</span></figcaption></figure>
+        </div>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="card-head"><h3><i data-lucide="activity"></i> Fraud score over time</h3><span class="small muted">Warn {{ s.exam.warn_threshold }} · critical {{ s.exam.critical_threshold }}</span></div>
+      <div class="card-body"><div style="height:220px"><canvas id="score-chart"></canvas></div></div>
+    </div>
+
+    <div class="card">
+      <div class="card-head"><h3><i data-lucide="list-tree"></i> Event timeline</h3>
+        <div class="row"><select class="input input-sm" id="ev-filter" style="width:auto"><option value="">All events</option><option value="high">High & critical</option><option value="pending">Unreviewed</option><option value="evidence">With evidence</option></select></div></div>
+      <ul class="timeline" id="timeline"></ul>
+      <div class="empty" id="timeline-empty" hidden><i data-lucide="sparkles"></i><div>No suspicious activity recorded.</div></div>
+    </div>
+
+    {% if s.answer_sheets %}
+    <div class="card"><div class="card-head"><h3><i data-lucide="files"></i> Answer sheets ({{ s.answer_sheets|length }})</h3></div>
+      <div class="card-body gallery">{% for p in s.answer_sheets %}<a href="#" data-zoom="{{ url_for('main.media', rel=p) }}"><img src="{{ url_for('main.media', rel=p) }}" alt="Page {{ loop.index }}"><span>p.{{ loop.index }}</span></a>{% endfor %}</div></div>
+    {% endif %}
+
+    <div class="card">
+      <div class="card-head"><h3><i data-lucide="images"></i> Snapshots & evidence</h3><span class="small muted">{{ snapshots|length }} shown</span></div>
+      <div class="card-body">
+        {% if snapshots %}<div class="gallery">{% for sn in snapshots %}<a href="#" class="{{ 'ev' if sn.kind == 'evidence' }}" data-zoom="{{ url_for('main.media', rel=sn.path) }}"><img src="{{ url_for('main.media', rel=sn.path) }}" alt="" loading="lazy"><span>{{ sn.created_at|dt('%H:%M:%S') }}{% if sn.kind == 'evidence' %} · evidence{% elif sn.face_count is not none %} · {{ sn.face_count }} face{{ 's' if sn.face_count != 1 }}{% endif %}</span></a>{% endfor %}</div>
+        {% else %}<div class="empty small">No snapshots stored.</div>{% endif %}
+      </div>
+    </div>
+  </div>
+
+  <div class="stack">
+    <div class="card card-pad">
+      <div class="row" style="gap:18px">
+        <div id="ring">{{ score_ring(s.fraud_score, s.risk_level, 'lg') }}</div>
+        <div><div class="small muted">AI fraud score</div><div class="strong" style="font-size:18px" id="risk-text">{{ s.risk_level|capitalize }} risk</div>
+          <div class="small muted">Peak <b id="peak">{{ s.peak_score|round|int }}</b> · <span id="ev-count">{{ s.events|length }}</span> events</div>
+          {% if s.is_active %}<div class="small muted" id="remaining"></div>{% endif %}</div>
+      </div>
+      <hr>
+      <div class="label mb-1">Contribution by category</div>
+      <div class="bars" id="breakdown">
+        {% set maxv = (breakdown.values()|max) if breakdown else 1 %}
+        {% for cat, pts in breakdown.items() %}<div class="bar-row"><span style="text-transform:capitalize">{{ cat }}</span><div class="meter"><span style="width:{{ (100 * pts / maxv)|round }}%"></span></div><span class="num small">{{ pts }}</span></div>
+        {% else %}<div class="small muted">No contributing events.</div>{% endfor %}
+      </div>
+      <p class="tiny muted mt-1 mb-0">Points are weighted by severity, repetition, recency and confidence. Dismissed events are excluded.</p>
+    </div>
+
+    <div class="card">
+      <div class="card-head"><h3><i data-lucide="bar-chart-3"></i> Event summary</h3></div>
+      {% if summary %}<table class="table"><tbody>{% for r in summary %}<tr><td class="small">{{ r.label }}</td><td>{{ sev_badge(r.severity) }}</td><td class="num strong">{{ r.count }}</td></tr>{% endfor %}</tbody></table>
+      {% else %}<div class="empty small">Clean session.</div>{% endif %}
+    </div>
+
+    <form class="card" method="post" action="{{ url_for('proctor.verdict', session_id=s.id) }}">
+      <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+      <div class="card-head"><h3><i data-lucide="gavel"></i> Verdict</h3>{{ verdict_badge(s.verdict) }}</div>
+      <div class="card-body">
+        <div class="stack" style="gap:8px">
+          {% for k, v in s.VERDICTS.items() %}<label class="check"><input type="radio" name="verdict" value="{{ k }}" {{ 'checked' if s.verdict == k }}><div><strong>{{ v }}</strong><span>{{ {'cleared':'No malpractice. Events were false positives or minor.','suspicious':'Concerning behaviour without conclusive evidence.','malpractice':'Evidence confirms cheating or impersonation.'}[k] }}</span></div></label>{% endfor %}
+        </div>
+        <div class="field mt-1"><label>Notes</label><textarea class="input" name="notes" rows="3" placeholder="Reasoning, evidence references…">{{ s.verdict_notes or '' }}</textarea></div>
+        <label class="row small"><input type="checkbox" name="confirm_pending" value="1" style="accent-color:var(--primary)"> Mark unreviewed high/critical events as confirmed</label>
+        {% if s.reviewed_by %}<p class="tiny muted mt-1 mb-0">Last reviewed by {{ s.reviewed_by.name }} · {{ s.reviewed_at|dt }}</p>{% endif %}
+      </div>
+      <div class="card-foot"><button class="btn btn-primary"><i data-lucide="save"></i> Save verdict</button></div>
+    </form>
+
+    <div class="card">
+      <div class="card-head"><h3><i data-lucide="messages-square"></i> Messages to student</h3></div>
+      <div id="messages" class="card-body small stack" style="gap:8px"></div>
+    </div>
+
+    <div class="card card-pad">
+      <h3 class="mb-1">Session details</h3>
+      <dl class="kv small" style="grid-template-columns:120px 1fr">
+        <dt>Session</dt><dd>#{{ s.id }}</dd>
+        <dt>Submitted</dt><dd>{{ s.submitted_at|dt }}</dd>
+        <dt>Score</dt><dd>{% if s.percent is not none %}{{ s.score|round(2) }} / {{ s.max_score|round(2) }} ({{ s.percent }}%){% else %}—{% endif %}{% if s.needs_manual_grading %} <span class="badge badge-amber">needs grading</span>{% endif %}</dd>
+        <dt>Extra time</dt><dd>{{ s.extra_minutes or 0 }} min</dd>
+        <dt>Warnings sent</dt><dd>{{ s.warnings_sent or 0 }}</dd>
+        <dt>IP address</dt><dd class="mono">{{ s.ip_address or '—' }}</dd>
+        <dt>Face model</dt><dd>{{ s.identity_backend or '—' }}</dd>
+        <dt>On-device AI</dt><dd>{{ 'yes' if (s.device_info or {}).get('onDeviceAI') else 'no / unknown' }}</dd>
+        <dt>Device</dt><dd class="tiny">{{ (s.device_info or {}).get('screen', '') }} {{ (s.device_info or {}).get('tz', '') }}<br>{{ (s.user_agent or '')|truncate(90) }}</dd>
+      </dl>
+    </div>
+  </div>
+</div>
+{% endblock %}
+{% block scripts %}
+<script src="{{ url_for('static', filename='vendor/chart-4.4.1.umd.min.js') }}"></script>
+<script>
+window.SESSION = {{ {
+  'id': s.id, 'active': s.is_active, 'warn': s.exam.warn_threshold, 'critical': s.exam.critical_threshold,
+  'live': url_for('api.live_session', session_id=s.id),
+  'message': url_for('api.live_message', session_id=s.id),
+  'terminate': url_for('api.live_terminate', session_id=s.id),
+  'approve': url_for('api.live_approve', session_id=s.id),
+  'flag': url_for('api.live_flag', session_id=s.id),
+  'extend': url_for('api.live_extend', session_id=s.id),
+  'review': url_for('api.review_event', event_id=0),
+}|tojson }};
+</script>
+<script src="{{ url_for('static', filename='js/session.js') }}"></script>
+{% endblock %}

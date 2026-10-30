@@ -1,0 +1,36 @@
+{% extends "layout.html" %}
+{% block title %}Exams{% endblock %}
+{% block crumbs %}Exams{% endblock %}
+{% block content %}
+<div class="page-head"><div><h1>Exams</h1><p>Create, schedule and configure the proctoring policy for each exam.</p></div>
+  <a class="btn btn-primary" href="{{ url_for('proctor.exam_edit') }}"><i data-lucide="plus"></i> New exam</a></div>
+<div class="card table-wrap">
+  {% if exams %}
+  <table class="table">
+    <thead><tr><th>Exam</th><th>Mode</th><th>Window</th><th>Status</th><th class="num">Questions</th><th class="num">Attempts</th><th>Proctoring</th><th></th></tr></thead>
+    <tbody>{% for e in exams %}
+      <tr>
+        <td><div class="strong">{{ e.title }}</div><small class="muted">{{ e.subject or '' }} · {{ e.duration_minutes }} min · by {{ e.created_by.name if e.created_by else '—' }}</small></td>
+        <td><span class="badge {{ 'badge-indigo' if e.mode == 'online' else 'badge-blue' }}">{{ 'Online' if e.mode == 'online' else 'Written' }}</span></td>
+        <td class="small">{{ e.start_at|dt('%d %b %H:%M') if e.start_at else 'Any time' }}<br><span class="muted">→ {{ e.end_at|dt('%d %b %H:%M') if e.end_at else 'no end' }}</span></td>
+        <td>{% set a = e.availability() %}<span class="badge {{ {'open':'badge-green','upcoming':'badge-blue','draft':'','closed':'','archived':''}.get(a,'') }}">{{ a|capitalize }}</span></td>
+        <td class="num">{{ e.questions|length }}</td>
+        <td class="num">{{ e.sessions|length }}</td>
+        <td class="small muted">
+          <span title="Identity">{{ '🪪' if e.require_identity }}</span><span title="Liveness">{{ '👁️' if e.require_liveness }}</span><span title="Audio">{{ '🎙️' if e.monitor_audio }}</span><span title="Objects">{{ '📱' if e.monitor_objects }}</span><span title="Full-screen">{{ '🖥️' if e.enforce_fullscreen }}</span>
+          <div class="tiny">warn {{ e.warn_threshold }} · crit {{ e.critical_threshold }}{{ ' · auto-end' if e.auto_terminate }}</div></td>
+        <td class="num">
+          <div class="row" style="justify-content:flex-end;gap:6px">
+            <a class="btn btn-sm" href="{{ url_for('proctor.exam_report', exam_id=e.id) }}" title="Results"><i data-lucide="bar-chart-3"></i></a>
+            <a class="btn btn-sm" href="{{ url_for('proctor.live', exam_id=e.id) }}" title="Live"><i data-lucide="monitor-play"></i></a>
+            <a class="btn btn-sm" href="{{ url_for('proctor.exam_edit', exam_id=e.id) }}" title="Edit"><i data-lucide="pencil"></i></a>
+            <form method="post" action="{{ url_for('proctor.exam_duplicate', exam_id=e.id) }}"><input type="hidden" name="csrf_token" value="{{ csrf_token() }}"><button class="btn btn-sm" title="Duplicate"><i data-lucide="copy"></i></button></form>
+            <form method="post" action="{{ url_for('proctor.exam_delete', exam_id=e.id) }}"><input type="hidden" name="csrf_token" value="{{ csrf_token() }}"><button class="btn btn-sm btn-danger" title="Delete" data-confirm="Delete “{{ e.title }}”?" data-confirm-body="Exams with attempts are archived instead."><i data-lucide="trash-2"></i></button></form>
+          </div>
+        </td>
+      </tr>
+    {% endfor %}</tbody>
+  </table>
+  {% else %}<div class="empty"><i data-lucide="file-plus-2"></i><div>No exams yet. <a href="{{ url_for('proctor.exam_edit') }}">Create the first one</a>.</div></div>{% endif %}
+</div>
+{% endblock %}

@@ -1,0 +1,44 @@
+{% extends "layout.html" %}
+{% from "partials/macros.html" import risk_badge, score_ring, person, status_badge, verdict_badge %}
+{% block title %}Results · {{ exam.title }}{% endblock %}
+{% block crumbs %}Exams / {{ exam.title }} / Results{% endblock %}
+{% block content %}
+<div class="page-head">
+  <div><h1>{{ exam.title }}</h1><p>{{ exam.subject or '' }} · {{ exam.MODES[exam.mode] }} · {{ exam.duration_minutes }} min · {{ exam.total_marks|round(1) }} marks</p></div>
+  <div class="page-actions">
+    <a class="btn" href="{{ url_for('proctor.exam_edit', exam_id=exam.id) }}"><i data-lucide="pencil"></i> Edit</a>
+    <a class="btn" href="{{ url_for('proctor.exam_export', exam_id=exam.id) }}"><i data-lucide="file-spreadsheet"></i> Export CSV</a>
+    <button class="btn" onclick="window.print()"><i data-lucide="printer"></i> Print</button>
+  </div>
+</div>
+<div class="grid g-4 mb-2">
+  <div class="card stat"><div class="icon"><i data-lucide="users"></i></div><div><div class="value">{{ stats.attempts }}</div><div class="label">Attempts ({{ stats.finished }} finished)</div></div></div>
+  <div class="card stat"><div class="icon green"><i data-lucide="target"></i></div><div><div class="value">{{ stats.avg_score ~ '%' if stats.avg_score is not none else '—' }}</div><div class="label">Average score · pass rate {{ stats.pass_rate ~ '%' if stats.pass_rate is not none else '—' }}</div></div></div>
+  <div class="card stat"><div class="icon amber"><i data-lucide="shield-alert"></i></div><div><div class="value">{{ stats.flagged }}</div><div class="label">Flagged · avg peak fraud {{ stats.avg_fraud if stats.avg_fraud is not none else '—' }}</div></div></div>
+  <div class="card stat"><div class="icon red"><i data-lucide="octagon-x"></i></div><div><div class="value">{{ stats.malpractice }}</div><div class="label">Malpractice · {{ stats.terminated }} terminated</div></div></div>
+</div>
+<div class="grid g-main">
+  <div class="card table-wrap">
+    <div class="card-head"><h3><i data-lucide="table"></i> Candidates</h3></div>
+    {% if rows %}
+    <table class="table">
+      <thead><tr><th>Candidate</th><th>Status</th><th class="num">Result</th><th>Peak fraud</th><th>Verdict</th><th></th></tr></thead>
+      <tbody>{% for s in rows %}
+        <tr><td>{{ person(s.student) }}</td><td>{{ status_badge(s) }}</td>
+          <td class="num">{% if s.needs_manual_grading %}<a class="badge badge-amber" href="{{ url_for('proctor.grade', session_id=s.id) }}">Grade</a>{% elif s.percent is not none %}<b>{{ s.percent }}%</b> {% if s.passed %}<span class="badge badge-green">Pass</span>{% else %}<span class="badge badge-red">Fail</span>{% endif %}{% else %}—{% endif %}</td>
+          <td>{{ score_ring(s.peak_score, s.risk_level, 'sm') }}</td><td>{{ verdict_badge(s.verdict) }}</td>
+          <td class="num"><a class="btn btn-sm" href="{{ url_for('proctor.session_detail', session_id=s.id) }}">Open</a></td></tr>
+      {% endfor %}</tbody>
+    </table>
+    {% else %}<div class="empty"><i data-lucide="inbox"></i><div>No attempts yet.</div></div>{% endif %}
+  </div>
+  <div class="card">
+    <div class="card-head"><h3><i data-lucide="bar-chart-3"></i> Most frequent events</h3></div>
+    <div class="card-body bars">
+      {% set maxv = (top_events|map(attribute=1)|max) if top_events else 1 %}
+      {% for t, n in top_events %}<div class="bar-row" style="grid-template-columns:150px 1fr 36px"><span class="small">{{ catalog_entry(t).label }}</span><div class="meter"><span style="width:{{ (100 * n / maxv)|round }}%"></span></div><span class="num small">{{ n }}</span></div>
+      {% else %}<div class="small muted">No events recorded.</div>{% endfor %}
+    </div>
+  </div>
+</div>
+{% endblock %}

@@ -1,0 +1,35 @@
+{% extends "base.html" %}
+{% block title %}Sign in{% endblock %}
+{% block body %}
+<div class="auth-wrap">
+  {% include "auth/_hero.html" %}
+  <div class="auth-panel">
+    <div class="auth-card">
+      <h2>Welcome back</h2>
+      <p class="muted mb-2">Sign in to take or supervise exams.</p>
+      <form method="post" class="card card-pad" novalidate>
+        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+        <div class="field"><label for="email">Email</label><input class="input" id="email" name="email" type="email" autocomplete="username" value="{{ email or '' }}" required autofocus></div>
+        <div class="field"><label for="password">Password</label><input class="input" id="password" name="password" type="password" autocomplete="current-password" required></div>
+        <label class="row small mb-2" style="gap:8px"><input type="checkbox" name="remember" style="accent-color:var(--primary)"> Keep me signed in</label>
+        <button class="btn btn-primary btn-block btn-lg"><i data-lucide="log-in"></i> Sign in</button>
+        <p class="center small muted mt-2 mb-0">New student? <a href="{{ url_for('auth.register') }}">Create an account with face ID</a></p>
+      </form>
+      <div class="demo-box">
+        <div class="strong mb-1">Demo accounts</div>
+        <div class="row between"><span>Admin · admin@proctor.ai / admin123</span><button type="button" data-fill="admin@proctor.ai|admin123">Use</button></div>
+        <div class="row between"><span>Proctor · proctor@proctor.ai / proctor123</span><button type="button" data-fill="proctor@proctor.ai|proctor123">Use</button></div>
+        <div class="row between"><span>Student · student@proctor.ai / student123</span><button type="button" data-fill="student@proctor.ai|student123">Use</button></div>
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}
+{% block scripts %}
+<script>
+document.querySelectorAll('[data-fill]').forEach((b) => b.addEventListener('click', () => {
+  const [e, p] = b.dataset.fill.split('|');
+  document.getElementById('email').value = e; document.getElementById('password').value = p;
+}));
+</script>
+{% endblock %}

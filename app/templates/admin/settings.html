@@ -1,0 +1,33 @@
+{% extends "layout.html" %}
+{% block title %}AI engine{% endblock %}
+{% block crumbs %}Administration / AI engine{% endblock %}
+{% block content %}
+<form method="post">
+<input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+<div class="page-head">
+  <div><h1>AI decision engine</h1><p>Tune how much each detection contributes to the fraud score and how often it can repeat.</p></div>
+  <div class="page-actions"><button class="btn" name="action" value="reset" data-confirm="Restore all default weights?"><i data-lucide="rotate-ccw"></i> Restore defaults</button><button class="btn btn-primary" name="action" value="save"><i data-lucide="save"></i> Save</button></div>
+</div>
+<div class="grid g-3 mb-2">
+  <div class="card card-pad"><div class="small muted">Face model</div><div class="strong" style="font-size:18px">{{ face_backend }}</div><div class="small muted">match threshold {{ face_threshold }}</div></div>
+  <div class="card card-pad"><div class="small muted">YOLOv8 on server</div><div class="strong" style="font-size:18px">{{ 'Active' if yolo else 'Not installed' }}</div><div class="small muted">Browser detection is always on</div></div>
+  <div class="card card-pad"><div class="small muted">Scoring curve</div><div class="strong" style="font-size:18px">score = 100·(1 − e<sup>−points/{{ saturation|int }}</sup>)</div><div class="small muted">behavioural events halve every {{ (half_life / 60)|int }} min</div></div>
+</div>
+<div class="card table-wrap">
+  <table class="table">
+    <thead><tr><th>Detection</th><th>Category</th><th>Severity</th><th>Decays</th><th>Weight (points)</th><th>Cooldown (s)</th></tr></thead>
+    <tbody>{% for r in rows %}
+      <tr>
+        <td><div class="strong small">{{ r.label }}</div><code class="tiny muted">{{ r.type }}</code></td>
+        <td class="small" style="text-transform:capitalize">{{ r.category }}</td>
+        <td><span class="badge sev-{{ r.severity }}">{{ r.severity }}</span></td>
+        <td class="small">{{ 'Yes' if r.decays else 'No (hard evidence)' }}</td>
+        <td><div class="row"><input class="input input-sm" type="number" min="0" max="100" step="0.5" name="w-{{ r.type }}" value="{{ r.weight }}" style="width:90px">{% if r.weight != r.default %}<span class="tiny muted">default {{ r.default }}</span>{% endif %}</div></td>
+        <td><div class="row"><input class="input input-sm" type="number" min="0" max="3600" name="c-{{ r.type }}" value="{{ r.cooldown }}" style="width:90px">{% if r.cooldown != r.default_cooldown %}<span class="tiny muted">default {{ r.default_cooldown }}</span>{% endif %}</div></td>
+      </tr>
+    {% endfor %}</tbody>
+  </table>
+</div>
+<div class="callout mt-2"><i data-lucide="info"></i><div class="small">Repeated events count 1×, 1.25×, 1.5× and so on, up to 2× their weight. Confidence scales the points, and an event a proctor confirms counts at full confidence. Correlation rules add composite events, for example <i>looking away + speech within 30 s → suspected assistance</i>. Dismissed events never count.</div></div>
+</form>
+{% endblock %}

@@ -1,0 +1,31 @@
+{% macro risk_badge(level) -%}
+<span class="badge risk-{{ level or 'low' }}"><span class="dot"></span> {{ (level or 'low')|capitalize }}</span>
+{%- endmacro %}
+
+{% macro sev_badge(sev) -%}
+<span class="badge sev-{{ sev }}">{{ sev|capitalize }}</span>
+{%- endmacro %}
+
+{% macro score_ring(value, level, size='') -%}
+{% set colors = {'low':'var(--risk-low)','medium':'var(--risk-medium)','high':'var(--risk-high)','critical':'var(--risk-critical)'} %}
+<div class="score-ring {{ size }}" style="--v: {{ value or 0 }}; --c: {{ colors.get(level or 'low') }}" title="Fraud score {{ value or 0 }}/100"><b>{{ (value or 0)|round|int }}</b></div>
+{%- endmacro %}
+
+{% macro status_badge(s) -%}
+{% set cls = {'in_progress':'badge-blue','pending_approval':'badge-amber','submitted':'badge-green','auto_submitted':'badge-green','terminated':'badge-red'} %}
+<span class="badge {{ cls.get(s.status, '') }}">{% if s.status == 'in_progress' %}<span class="dot"></span>{% endif %} {{ s.status_label }}</span>
+{%- endmacro %}
+
+{% macro verdict_badge(v) -%}
+{% if v == 'cleared' %}<span class="badge badge-green"><i data-lucide="badge-check" style="width:13px;height:13px"></i> Cleared</span>
+{% elif v == 'suspicious' %}<span class="badge badge-amber"><i data-lucide="alert-triangle" style="width:13px;height:13px"></i> Suspicious</span>
+{% elif v == 'malpractice' %}<span class="badge badge-red"><i data-lucide="octagon-x" style="width:13px;height:13px"></i> Malpractice</span>
+{% else %}<span class="badge">Not reviewed</span>{% endif %}
+{%- endmacro %}
+
+{% macro person(user, sub=None) -%}
+<div class="person">
+  {% if user.photo_path %}<img class="avatar" src="{{ url_for('main.media', rel=user.photo_path) }}" alt="">{% else %}<div class="avatar">{{ user.initials }}</div>{% endif %}
+  <div><div class="strong">{{ user.name }}</div><small>{{ sub if sub is not none else (user.student_code or user.email) }}</small></div>
+</div>
+{%- endmacro %}

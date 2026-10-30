@@ -1,0 +1,28 @@
+{% extends "layout.html" %}
+{% from "partials/macros.html" import person %}
+{% block title %}Users{% endblock %}
+{% block crumbs %}Administration / Users{% endblock %}
+{% block content %}
+<div class="page-head"><div><h1>Users</h1><p>Manage students, proctors and administrators, and their face ID enrolment.</p></div>
+  <a class="btn btn-primary" href="{{ url_for('admin.user_edit') }}"><i data-lucide="user-plus"></i> Add user</a></div>
+<div class="tabs">
+  {% for r, label in [('', 'All'), ('student', 'Students'), ('proctor', 'Proctors'), ('admin', 'Admins')] %}<a href="{{ url_for('admin.users', role=r, q=q) }}" class="{{ 'active' if role == r }}">{{ label }}</a>{% endfor %}
+</div>
+<form class="toolbar" method="get"><input type="hidden" name="role" value="{{ role }}"><input class="input" name="q" value="{{ q }}" placeholder="Search name, email, ID…"><button class="btn"><i data-lucide="search"></i> Search</button></form>
+<div class="card table-wrap">
+  <table class="table">
+    <thead><tr><th>User</th><th>Role</th><th>Department</th><th>Face ID</th><th>Status</th><th>Last login</th><th></th></tr></thead>
+    <tbody>{% for u in rows %}
+      <tr>
+        <td>{{ person(u, u.email) }}</td>
+        <td><span class="badge {{ {'admin':'badge-red','proctor':'badge-indigo','student':'badge-blue'}[u.role] }}">{{ u.role|capitalize }}</span>{% if u.student_code %} <span class="small muted">{{ u.student_code }}</span>{% endif %}</td>
+        <td class="small">{{ u.department or '—' }}</td>
+        <td>{% if u.face_embedding_raw %}<span class="badge badge-green"><i data-lucide="scan-face" style="width:13px;height:13px"></i> {{ u.face_backend }}</span>{% elif u.role == 'student' %}<span class="badge badge-amber">Missing</span>{% else %}<span class="muted small">—</span>{% endif %}</td>
+        <td>{% if u.is_active %}<span class="badge badge-green">Active</span>{% else %}<span class="badge">Inactive</span>{% endif %}</td>
+        <td class="small muted">{{ u.last_login_at|ago if u.last_login_at else 'never' }}</td>
+        <td class="num"><a class="btn btn-sm" href="{{ url_for('admin.user_edit', user_id=u.id) }}">Manage</a></td>
+      </tr>
+    {% else %}<tr><td colspan="7" class="empty">No users found.</td></tr>{% endfor %}</tbody>
+  </table>
+</div>
+{% endblock %}

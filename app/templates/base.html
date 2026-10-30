@@ -1,0 +1,29 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="csrf-token" content="{{ csrf_token() }}">
+  <title>{% block title %}{{ app_name }}{% endblock %} · {{ app_name }}</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@500;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/app.css') }}">
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'><rect width='32' height='32' rx='8' fill='%236366f1'/><circle cx='16' cy='14' r='6' fill='none' stroke='white' stroke-width='2.5'/><path d='M8 26c2-4 5-5 8-5s6 1 8 5' fill='none' stroke='white' stroke-width='2.5'/></svg>">
+  <script>
+    (function () { try { var t = localStorage.getItem('theme'); if (t) document.documentElement.setAttribute('data-theme', t); } catch (e) {} })();
+  </script>
+  {% block head %}{% endblock %}
+</head>
+<body class="{% block body_class %}{% endblock %}">
+  <div class="flash-stack" id="flash-stack">
+    {% for category, message in get_flashed_messages(with_categories=true) %}
+      <div class="toast {{ category }}" role="status"><span>{{ message }}</span><button class="close" aria-label="Dismiss" onclick="this.parentElement.remove()">&times;</button></div>
+    {% endfor %}
+  </div>
+  {% block body %}{% endblock %}
+  <script src="{{ url_for('static', filename='vendor/lucide-0.460.0.min.js') }}"></script>
+  <script src="{{ url_for('static', filename='js/app.js') }}"></script>
+  {% block scripts %}{% endblock %}
+</body>
+</html>
