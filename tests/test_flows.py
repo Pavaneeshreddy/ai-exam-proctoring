@@ -135,11 +135,12 @@ def test_same_person_must_remain_visible(client, setup):
     s = ExamSession.query.one()
     ok = client.post(f"/api/session/{s.id}/frame", json={"image": photo(BLUE)}).json
     assert ok["identity"]["match"] and ok["events"] == []
-    # a different person sits down: one mismatching frame is tolerated, the second raises the alarm
-    first = client.post(f"/api/session/{s.id}/frame", json={"image": photo(RED)}).json
-    assert "identity_mismatch" not in first["events"]
-    second = client.post(f"/api/session/{s.id}/frame", json={"image": photo(RED)}).json
-    assert "identity_mismatch" in second["events"]
+    # a different person sits down: brief mismatches are tolerated, a sustained one raises the alarm
+    for _ in range(2):
+        r = client.post(f"/api/session/{s.id}/frame", json={"image": photo(RED)}).json
+        assert "identity_mismatch" not in r["events"]
+    third = client.post(f"/api/session/{s.id}/frame", json={"image": photo(RED)}).json
+    assert "identity_mismatch" in third["events"]
     ev = ProctorEvent.query.filter_by(event_type="identity_mismatch").one()
     assert ev.severity == "critical" and ev.evidence_path
     # nobody in front of the camera
@@ -250,3 +251,43 @@ def test_enrolled_face_is_reencoded_when_the_model_changes(client, setup):
     db.session.refresh(student)
     assert student.face_backend == "fake"
     assert begin(client, setup["exam"], photo(BLUE)).json["verified"]
+
+
+def test_turned_face_is_not_compared_for_identity(client, setup):
+    login(client, "s@x.io", "password1")
+    begin(client, setup["exam"], photo(BLUE))
+    s = ExamSession.query.one()
+    for _ in range(4):  # student looks sideways: low similarity, but must not count as another person
+        r = client.post(f"/api/session/{s.id}/frame", json={"image": photo(RED), "pose": {"yaw": 35, "pitch": 0}}).json
+        assert "identity_mismatch" not in r["events"]
+        assert r["identity"]["skipped"]
+
+
+def test_server_trusts_browser_when_frontal_detector_misses_face(client, setup):
+    login(client, "s@x.io", "password1")
+    begin(client, setup["exam"], photo(BLUE))
+    s = ExamSession.query.one()
+    original = FakeAnalyzer.detect
+    try:
+        FakeAnalyzer.detect = lambda self, img: []  # server's detector misses the face
+        r = client.post(f"/api/session/{s.id}/frame", json={"image": photo(BLUE), "faces": 1}).json
+        assert "face_missing" not in r["events"]
+        r = client.post(f"/api/session/{s.id}/frame", json={"image": photo(BLUE), "faces": 0}).json
+        assert "face_missing" in r["events"]
+    finally:
+        FakeAnalyzer.detect = original
+
+
+def test_warning_limit_ends_the_exam(client, setup):
+    setup["exam"].max_violations = 3
+    db.session.commit()
+    login(client, "s@x.io", "password1")
+    begin(client, setup["exam"], photo(BLUE))
+    s = ExamSession.query.one()
+    r = client.post(f"/api/session/{s.id}/events", json={"events": [{"type": "tab_switch"}, {"type": "right_click"}]}).json
+    assert r["violations"] == 1 and r["max_violations"] == 3  # right-click is info level, not a strike
+    client.post(f"/api/session/{s.id}/events", json={"events": [{"type": "fullscreen_exit"}]})
+    r = client.post(f"/api/session/{s.id}/events", json={"events": [{"type": "clipboard"}]}).json
+    assert r["status"] == "terminated"
+    db.session.refresh(s)
+    assert "3 integrity warnings" in s.terminated_reason

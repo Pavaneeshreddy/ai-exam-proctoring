@@ -290,6 +290,7 @@ def _apply_exam_form(exam, form):
         "monitor_audio", "monitor_objects", "enforce_fullscreen", "auto_terminate",
     ):
         setattr(exam, flag, bool(form.get(flag)))
+    exam.max_violations = min(100, max(0, form.get("max_violations", type=int) or 0))
     exam.warn_threshold = min(100, max(5, form.get("warn_threshold", type=int) or 40))
     exam.critical_threshold = min(100, max(exam.warn_threshold + 1, form.get("critical_threshold", type=int) or 75))
 

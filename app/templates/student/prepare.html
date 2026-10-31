@@ -53,6 +53,7 @@
         <li><i data-lucide="smartphone"></i><div><b>No phones, books, notes or extra screens</b>{% if exam.mode == 'written' %} (blank answer sheets are allowed){% endif %}. Objects are detected by AI and screenshots are saved as evidence.</div></li>
         <li><i data-lucide="maximize"></i><div><b>Stay in full-screen</b> and on this tab. Switching tabs, copying or opening developer tools is logged.</div></li>
         <li><i data-lucide="eye"></i><div><b>Keep your eyes on {{ 'the screen and your paper' if exam.mode == 'written' else 'the screen' }}.</b> Repeatedly looking away or turning your head is flagged.</div></li>
+        {% if exam.max_violations %}<li><i data-lucide="shield-alert"></i><div><b>You get {{ exam.max_violations }} warnings.</b> Each violation shows a warning on screen. On warning {{ exam.max_violations }} the exam ends automatically and is sent for review.</div></li>{% endif %}
         <li><i data-lucide="gauge"></i><div><b>An AI fraud score is calculated</b> from these events. {% if exam.auto_terminate %}If it reaches {{ exam.critical_threshold }}, the exam ends automatically.{% else %}High scores are reviewed by a proctor.{% endif %}</div></li>
       </ul>
       <label class="check mt-2"><input type="checkbox" id="consent"><div><strong>I understand and agree.</strong><span>I consent to camera, microphone and browser activity being monitored and recorded for this exam. Evidence is retained for review by authorised examiners.</span></div></label>

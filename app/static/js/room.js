@@ -196,6 +196,7 @@
     if (finished && r.status === 'in_progress') return;
     if (r.status === 'terminated') {
       finished = true;
+      $('#violation').hidden = true;
       window.Proctor.stop();
       App.modal({ title: 'Exam terminated', body: App.escapeHtml(r.reason || 'Your exam was terminated by the proctor.'), icon: 'octagon-x', danger: true, confirmText: 'View details', cancelText: '' })
         .then(() => leave(r.redirect || location.href));
@@ -269,6 +270,36 @@
   P.on('message', (m) => {
     const title = m.kind === 'warning' ? 'Message from your proctor' : m.kind === 'system' ? 'Integrity notice' : 'Notice';
     App.modal({ title, body: App.escapeHtml(m.body), icon: m.kind === 'warning' ? 'alert-triangle' : 'info', danger: m.kind !== 'info', confirmText: 'I understand', cancelText: '' });
+  });
+  let strikes = { violations: 0, max_violations: 0 };
+  let bannerTimer = null;
+  function paintStrikes() {
+    const el = $('#strikes');
+    if (!strikes.max_violations && !strikes.violations) { el.hidden = true; return; }
+    el.hidden = false;
+    const left = strikes.max_violations ? strikes.max_violations - strikes.violations : null;
+    el.className = 'badge ' + (left !== null && left <= 2 ? 'badge-red' : strikes.violations ? 'badge-amber' : '');
+    $('#strikes-text').textContent = strikes.max_violations ? `Warnings ${strikes.violations}/${strikes.max_violations}` : `Warnings ${strikes.violations}`;
+  }
+  function countText() {
+    const left = strikes.max_violations ? strikes.max_violations - strikes.violations : null;
+    return left === null ? 'This has been recorded and reported to your proctor.'
+      : `Recorded and reported to your proctor. ${Math.max(0, left)} warning(s) left before the exam ends automatically.`;
+  }
+  P.on('strikes', (r) => {
+    strikes = { violations: r.violations, max_violations: r.max_violations };
+    paintStrikes();
+    if (!$('#violation').hidden) $('#violation-count').textContent = countText();
+  });
+  P.on('violation', (v) => {
+    if (finished) return;
+    $('#violation-text').textContent = v.text;
+    $('#violation-count').textContent = countText();
+    const b = $('#violation');
+    b.hidden = false;
+    b.style.animation = 'none'; void b.offsetWidth; b.style.animation = '';
+    clearTimeout(bannerTimer);
+    bannerTimer = setTimeout(() => { b.hidden = true; }, 4500);
   });
   P.on('notice', (n) => App.toast(n.text, n.kind === 'warning' ? 'warning' : 'info', 4500));
   P.on('fullscreen', (isFull) => { $('#fs-blocker').hidden = isFull || finished || !cfg.enforceFullscreen; });

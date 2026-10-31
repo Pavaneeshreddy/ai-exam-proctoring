@@ -21,6 +21,7 @@ from ..services import (
     send_message,
     stamp,
     sweep_sessions,
+    violation_count,
 )
 from ..utils import can_access_exam, staff_required
 
@@ -35,7 +36,66 @@ CLIENT_EVENTS = {
     "screenshot_attempt", "network_offline", "liveness_failed",
 }
 
-IDENTITY_MISMATCH_STREAK = 2  # consecutive non-matching frames before raising the alarm
+# consecutive non-matching frontal frames before raising "different person"
+IDENTITY_MISMATCH_STREAK = {"sface": 2, "dlib": 2}
+DEFAULT_MISMATCH_STREAK = 3
+BASELINE_FRAMES = 5  # first frontal frames of a session that calibrate the student's own match level
+# a frame must be this far below the student's own baseline (as well as below the global
+# threshold scaled down by it) before it counts as a mismatch
+BASELINE_MARGIN = {"sface": 0.25, "dlib": 0.06}
+DEFAULT_BASELINE_MARGIN = 0.05
+
+
+def _strikes(s):
+    return {
+        "violations": violation_count(s),
+        "max_violations": s.exam.max_violations or 0,
+        "reason": s.terminated_reason,
+        "redirect": url_for("student.result", session_id=s.id) if s.is_finished else None,
+    }
+
+
+def _comparable_frame(result, client_pose):
+    """Only near-frontal, single-face frames are fair to compare with the start photo."""
+    if result["faces"] != 1:
+        return False
+    pose = result.get("pose") or {}
+    if pose.get("profile"):
+        return False
+    for p in (pose, client_pose or {}):
+        if abs(p.get("yaw") or 0) > 20 or abs(p.get("pitch") or 0) > 22:
+            return False
+    return True
+
+
+def _check_identity(s, analyzer, identity, events):
+    """Same-person check with a per-session baseline.
+
+    The start photo is taken in the same room seconds before the exam, so the student's
+    first frontal frames give their own typical similarity. A different person scores far
+    below that baseline; natural variation (posture, light changing) does not.
+    """
+    sim = identity["similarity"]
+    s.last_identity_similarity = sim
+    backend = analyzer.backend
+    margin = BASELINE_MARGIN.get(backend, DEFAULT_BASELINE_MARGIN)
+    if (s.identity_samples or 0) < BASELINE_FRAMES and identity["match"]:
+        n = s.identity_samples or 0
+        s.identity_baseline = ((s.identity_baseline or 0) * n + sim) / (n + 1)
+        s.identity_samples = n + 1
+    limit = identity["threshold"]
+    if s.identity_baseline is not None and (s.identity_samples or 0) >= BASELINE_FRAMES:
+        limit = min(limit, s.identity_baseline - margin)
+    identity["limit"] = round(limit, 3)
+    identity["match"] = sim >= limit
+    if identity["match"]:
+        s.identity_mismatch_streak = 0
+        return
+    s.identity_mismatch_streak = (s.identity_mismatch_streak or 0) + 1
+    if s.identity_mismatch_streak >= IDENTITY_MISMATCH_STREAK.get(backend, DEFAULT_MISMATCH_STREAK):
+        gap = limit - sim
+        confidence = min(0.95, 0.6 + gap * 2) * getattr(analyzer, "reliability", 1.0)
+        events.append(("identity_mismatch", round(confidence, 2), {**identity, "streak": s.identity_mismatch_streak}))
 
 
 def _student_session(session_id, allow_pending=False):
@@ -114,8 +174,7 @@ def heartbeat(session_id):
         risk=s.risk_level,
         score=s.fraud_score,
         messages=out,
-        redirect=url_for("student.result", session_id=s.id) if s.is_finished else None,
-        reason=s.terminated_reason,
+        **_strikes(s),
     )
 
 
@@ -145,7 +204,7 @@ def client_events(session_id):
         if s.status != "in_progress":
             break
     db.session.commit()
-    return jsonify(ok=True, recorded=recorded, score=s.fraud_score, risk=s.risk_level, status=s.status)
+    return jsonify(ok=True, recorded=recorded, score=s.fraud_score, risk=s.risk_level, status=s.status, **_strikes(s))
 
 
 @bp.route("/session/<int:session_id>/frame", methods=["POST"])
@@ -171,19 +230,18 @@ def frame(session_id):
     s.last_heartbeat = now
     s.connection_lost = False
 
+    client_faces = data.get("faces")
+    if isinstance(client_faces, int) and client_faces >= 1 and result["faces"] == 0:
+        # browser landmarker still sees the face (e.g. turned or looking down); trust it over the
+        # server's frontal-only detector instead of reporting "face missing"
+        result["events"] = [e for e in result["events"] if e[0] not in ("face_missing", "head_turned")]
+
     identity = result.get("identity")
-    if identity:
-        s.last_identity_similarity = identity["similarity"]
-        if identity["match"]:
-            s.identity_mismatch_streak = 0
-        else:
-            s.identity_mismatch_streak = (s.identity_mismatch_streak or 0) + 1
-            if s.identity_mismatch_streak >= IDENTITY_MISMATCH_STREAK:
-                gap = identity["threshold"] - identity["similarity"]
-                confidence = min(0.95, 0.6 + gap * 2) * getattr(analyzer, "reliability", 1.0)
-                result["events"].append(
-                    ("identity_mismatch", round(confidence, 2), {**identity, "streak": s.identity_mismatch_streak})
-                )
+    client_pose = data.get("pose") if isinstance(data.get("pose"), dict) else None
+    if identity and _comparable_frame(result, client_pose):
+        _check_identity(s, analyzer, identity, result["events"])
+    elif identity:
+        identity["skipped"] = "face not frontal"  # turned faces score low; head_turned covers them
 
     keep = current_app.config["SNAPSHOT_KEEP_SECONDS"]
     if s.last_snapshot_at is None or (now - s.last_snapshot_at).total_seconds() >= keep:
@@ -222,6 +280,7 @@ def frame(session_id):
         score=s.fraud_score,
         risk=s.risk_level,
         status=s.status,
+        **_strikes(s),
     )
 
 
@@ -241,7 +300,7 @@ def audio(session_id):
         if ev:
             raised.append(etype)
     db.session.commit()
-    return jsonify(ok=True, events=raised, score=s.fraud_score, risk=s.risk_level)
+    return jsonify(ok=True, events=raised, score=s.fraud_score, risk=s.risk_level, status=s.status, **_strikes(s))
 
 
 @bp.route("/session/<int:session_id>/answer", methods=["POST"])

@@ -130,6 +130,7 @@ class Exam(db.Model):
     warn_threshold = db.Column(db.Integer, default=40)
     critical_threshold = db.Column(db.Integer, default=75)
     auto_terminate = db.Column(db.Boolean, default=False)
+    max_violations = db.Column(db.Integer, default=10)  # 0 = unlimited warnings
 
     created_by_id = db.Column(db.Integer, db.ForeignKey("users.id"))
     created_at = db.Column(db.DateTime, default=utcnow)
@@ -225,6 +226,8 @@ class ExamSession(db.Model):
     liveness_passed = db.Column(db.Boolean)
     last_identity_similarity = db.Column(db.Float)
     identity_mismatch_streak = db.Column(db.Integer, default=0)
+    identity_baseline = db.Column(db.Float)  # typical similarity of this student in this session
+    identity_samples = db.Column(db.Integer, default=0)
     last_face_count = db.Column(db.Integer)
     last_frame_at = db.Column(db.DateTime)
     last_snapshot_at = db.Column(db.DateTime)

@@ -8,6 +8,7 @@
     <div class="title">{{ exam.title }}<small>{{ current_user.name }}{% if current_user.student_code %} · {{ current_user.student_code }}{% endif %}</small></div>
     <div class="spacer" style="flex:1"></div>
     <span class="save-state" id="save-state"><i data-lucide="cloud" style="width:14px;height:14px"></i> All changes saved</span>
+    <span class="badge" id="strikes" title="Integrity warnings recorded" hidden><i data-lucide="shield-alert" style="width:13px;height:13px"></i> <span id="strikes-text">0</span></span>
     <span class="badge badge-green" id="integrity"><span class="dot"></span> Integrity: good</span>
     <div class="timer" id="timer"><i data-lucide="timer"></i><span id="timer-text">--:--</span></div>
     <button class="btn btn-primary" id="submit-btn"><i data-lucide="send"></i> Submit</button>
@@ -53,6 +54,10 @@
   </div>
 </div>
 
+<div class="violation-banner" id="violation" role="alert" hidden>
+  <i data-lucide="alert-octagon"></i>
+  <div><b id="violation-text"></b><div class="small" id="violation-count"></div></div>
+</div>
 <div class="blocker" id="gate">
   <div class="box">
     <div class="big-ic" style="background:rgba(99,102,241,.18);color:#a5b4fc"><i data-lucide="maximize"></i></div>

@@ -368,6 +368,10 @@ table.table { width: 100%; border-collapse: collapse; }
 .blocker p { color: #b8bfd6; }
 .blocker .big-ic { width: 64px; height: 64px; border-radius: 18px; display: grid; place-items: center; background: rgba(239,68,68,.15); color: #f87171; margin: 0 auto; }
 .blocker .big-ic [data-lucide] { width: 32px; height: 32px; }
+.violation-banner { position: fixed; top: 70px; left: 50%; transform: translateX(-50%); z-index: 940; display: flex; gap: 12px; align-items: center; padding: 14px 20px; border-radius: 14px; background: #dc2626; color: #fff; box-shadow: var(--shadow-lg); max-width: min(620px, calc(100vw - 32px)); animation: shake .4s ease; }
+.violation-banner [data-lucide] { width: 26px; height: 26px; }
+.violation-banner .small { opacity: .9; }
+@keyframes shake { 0%,100% { transform: translateX(-50%); } 25% { transform: translateX(calc(-50% - 6px)); } 75% { transform: translateX(calc(-50% + 6px)); } }
 .sheet-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(110px, 1fr)); gap: 10px; }
 .sheet-grid .sheet { position: relative; border-radius: 10px; overflow: hidden; border: 1px solid var(--border); aspect-ratio: 3/4; background: var(--bg-sunken); }
 .sheet-grid .sheet img { width: 100%; height: 100%; object-fit: cover; }

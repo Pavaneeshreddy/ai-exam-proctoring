@@ -41,6 +41,7 @@ def create_app(config_class=Config):
 
     with app.app_context():
         db.create_all()
+        _add_missing_columns()
         if app.config.get("SEED_DEMO"):
             from .seed import seed_demo
 
@@ -84,6 +85,23 @@ def _register_template_helpers(app):
             "catalog_entry": engine.catalog_entry,
             "app_name": "ProctorAI",
         }
+
+
+# Columns added after the first release; create_all() does not alter existing tables.
+NEW_COLUMNS = [
+    ("exams", "max_violations", "INTEGER DEFAULT 10"),
+    ("exam_sessions", "identity_baseline", "FLOAT"),
+    ("exam_sessions", "identity_samples", "INTEGER DEFAULT 0"),
+]
+
+
+def _add_missing_columns():
+    inspector = db.inspect(db.engine)
+    with db.engine.begin() as conn:
+        for table, column, ddl in NEW_COLUMNS:
+            existing = {c["name"] for c in inspector.get_columns(table)}
+            if column not in existing:
+                conn.execute(db.text(f"ALTER TABLE {table} ADD COLUMN {column} {ddl}"))
 
 
 VISION_CDN = "https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.14"

@@ -45,7 +45,7 @@
     return create(lib.ObjectDetector, {
       baseOptions: { modelAssetPath: OBJECT_MODEL },
       runningMode: 'VIDEO',
-      scoreThreshold: 0.35,
+      scoreThreshold: 0.3,
       maxResults: 12,
     });
   }

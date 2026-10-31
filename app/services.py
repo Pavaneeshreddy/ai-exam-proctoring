@@ -143,7 +143,41 @@ def record_event(session, event_type, confidence=1.0, details=None, source="clie
             )
 
     recompute_score(session, now)
+    enforce_violation_limit(session, now)
     return ev
+
+
+# Events that count as a warning ("strike") for the student. System noise such as a
+# dropped connection, composite events (already counted via their parts) and info-level
+# events do not count.
+STRIKE_SEVERITIES = ("medium", "high", "critical")
+NON_STRIKE_CATEGORIES = ("system", "composite", "manual")
+
+
+def is_strike(event):
+    return (
+        event.review_status != "dismissed"
+        and event.severity in STRIKE_SEVERITIES
+        and event.category not in NON_STRIKE_CATEGORIES
+    )
+
+
+def violation_count(session):
+    return sum(1 for e in ProctorEvent.query.filter_by(session_id=session.id).all() if is_strike(e))
+
+
+def enforce_violation_limit(session, now=None):
+    limit = session.exam.max_violations or 0
+    if session.status != "in_progress" or limit <= 0:
+        return
+    if violation_count(session) >= limit:
+        finish_session(
+            session,
+            "terminated",
+            reason=f"Exam ended automatically: {limit} integrity warnings were recorded "
+            "(the maximum allowed for this exam). A proctor will review the evidence.",
+            now=now,
+        )
 
 
 def score_time(session, now=None):
