@@ -5,7 +5,7 @@
 <div class="page-head"><div><h1>Audit log</h1><p>Every sign-in, exam start and submission, verdict, termination and settings change.</p></div></div>
 <form class="toolbar" method="get"><select class="input" name="action" onchange="this.form.submit()"><option value="">All actions</option>{% for a in actions %}<option value="{{ a }}" {{ 'selected' if a == action }}>{{ a.replace('_',' ') }}</option>{% endfor %}</select></form>
 <div class="card table-wrap">
-  <table class="table"><thead><tr><th>Time (UTC)</th><th>User</th><th>Action</th><th>Target</th><th>Details</th><th>IP</th></tr></thead>
+  <table class="table"><thead><tr><th>Time ({{ zone_label }})</th><th>User</th><th>Action</th><th>Target</th><th>Details</th><th>IP</th></tr></thead>
     <tbody>{% for a in pagination.items %}<tr><td class="mono small">{{ a.created_at|dt('%Y-%m-%d %H:%M:%S') }}</td><td class="small">{{ a.user.name if a.user else 'System' }}</td><td><span class="badge">{{ a.action.replace('_',' ') }}</span></td><td class="small mono">{{ a.target or '' }}</td><td class="small">{{ (a.details or '')|truncate(90) }}</td><td class="small mono muted">{{ a.ip_address or '' }}</td></tr>{% else %}<tr><td colspan="6" class="empty">No entries.</td></tr>{% endfor %}</tbody></table>
 </div>
 {% if pagination.pages > 1 %}

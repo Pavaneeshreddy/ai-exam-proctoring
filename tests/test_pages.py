@@ -73,14 +73,41 @@ def test_exam_editor_creates_exam_and_imports_csv(client, seeded):
 
 
 def test_proctor_scope(client, seeded):
-    login(client, "proctor@proctor.ai", "proctor123")
-    other = Exam(title="Not mine", status="draft")
     from app.extensions import db
 
-    db.session.add(other)
+    other_proctor = User(name="Other Proctor", email="op@x.io", role="proctor")
+    other_proctor.set_password("password1")
+    shared = Exam(title="Admin exam, nobody assigned", status="published")
+    private = Exam(title="Someone else's", status="draft")
+    private.proctors = [other_proctor]
+    db.session.add_all([other_proctor, shared, private])
     db.session.commit()
-    assert client.get(f"/proctor/exams/{other.id}/edit").status_code == 403
+    login(client, "proctor@proctor.ai", "proctor123")
+    assert client.get(f"/proctor/exams/{shared.id}/edit").status_code == 200  # unassigned -> all proctors
+    assert client.get(f"/proctor/exams/{private.id}/edit").status_code == 403
+    listing = client.get("/proctor/exams").data.decode()
+    assert "Admin exam, nobody assigned" in listing and "Someone else" not in listing
     assert client.get("/admin/").status_code == 403
+
+
+def test_admin_created_exam_reaches_students_in_local_time(client, seeded, app):
+    app.config["TIMEZONE"] = "Asia/Kolkata"
+    login(client, "admin@proctor.ai", "admin123")
+    q = '[{"type":"mcq","text":"Q","options":["a","b"],"answer":0,"marks":1}]'
+    r = client.post("/proctor/exams/new", data={"title": "Draft one", "questions_json": q, "status": "draft"}, follow_redirects=True)
+    assert "Saved as a draft" in r.data.decode()
+    r = client.post("/proctor/exams/new", data={
+        "title": "Published one", "questions_json": q, "status": "draft", "publish": "1", "start_at": "2026-01-10T10:00",
+    }, follow_redirects=True)
+    exam = Exam.query.filter_by(title="Published one").one()
+    assert exam.status == "published"
+    assert exam.start_at.hour == 4 and exam.start_at.minute == 30  # 10:00 IST stored as 04:30 UTC
+    assert "Published" in r.data.decode()
+    assert 'value="2026-01-10T10:00"' in client.get(f"/proctor/exams/{exam.id}/edit").data.decode()
+    client.post("/logout")
+    login(client, "student@proctor.ai", "student123")
+    page = client.get("/student/").data.decode()
+    assert "Published one" in page and "Draft one" not in page
 
 
 def test_student_pages(client, seeded):

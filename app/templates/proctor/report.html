@@ -5,7 +5,7 @@
 <div class="report">
   <div class="row between no-print mb-2"><a class="btn" href="{{ url_for('proctor.session_detail', session_id=s.id) }}"><i data-lucide="arrow-left"></i> Back</a><button class="btn btn-primary" onclick="window.print()"><i data-lucide="printer"></i> Print / save PDF</button></div>
   <div class="row between" style="align-items:flex-start">
-    <div><div class="small muted">{{ app_name }} · Exam integrity report</div><h1>{{ s.student.name }}</h1><p class="muted">{{ s.exam.title }} · Session #{{ s.id }} · generated {{ now|dt }} UTC</p></div>
+    <div><div class="small muted">{{ app_name }} · Exam integrity report</div><h1>{{ s.student.name }}</h1><p class="muted">{{ s.exam.title }} · Session #{{ s.id }} · generated {{ now|dt }} {{ zone_label }}</p></div>
     <div class="center"><div style="font-size:44px;font-weight:800;color:{{ {'low':'var(--risk-low)','medium':'var(--risk-medium)','high':'var(--risk-high)','critical':'var(--risk-critical)'}[s.risk_level] }}">{{ s.fraud_score|round|int }}</div><div class="small muted">Fraud score · peak {{ s.peak_score|round|int }}</div></div>
   </div>
   <hr>
@@ -31,7 +31,7 @@
   <h2 class="mt-3 mb-1">Event summary</h2>
   <table class="table card"><thead><tr><th>Event</th><th>Severity</th><th class="num">Count</th></tr></thead><tbody>{% for r in summary %}<tr><td>{{ r.label }}</td><td>{{ sev_badge(r.severity) }}</td><td class="num">{{ r.count }}</td></tr>{% else %}<tr><td colspan="3" class="muted">No events.</td></tr>{% endfor %}</tbody></table>
   <h2 class="mt-3 mb-1">Full timeline</h2>
-  <table class="table card"><thead><tr><th>Time (UTC)</th><th>Event</th><th>Severity</th><th>Source</th><th class="num">Conf.</th><th>Review</th></tr></thead><tbody>
+  <table class="table card"><thead><tr><th>Time ({{ zone_label }})</th><th>Event</th><th>Severity</th><th>Source</th><th class="num">Conf.</th><th>Review</th></tr></thead><tbody>
     {% for e in s.events %}<tr style="{{ 'opacity:.5' if e.review_status == 'dismissed' }}"><td class="mono small">{{ e.created_at|dt('%H:%M:%S') }}</td><td>{{ e.message }}</td><td>{{ sev_badge(e.severity) }}</td><td class="small">{{ e.source }}</td><td class="num small">{{ (e.confidence * 100)|round|int }}%</td><td class="small">{{ e.review_status }}</td></tr>{% else %}<tr><td colspan="6" class="muted">No events.</td></tr>{% endfor %}
   </tbody></table>
   {% if evidence %}

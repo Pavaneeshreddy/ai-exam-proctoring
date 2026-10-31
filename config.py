@@ -32,6 +32,9 @@ class Config:
     SNAPSHOT_KEEP_SECONDS = int(os.environ.get("SNAPSHOT_KEEP_SECONDS", 30))
     HEARTBEAT_TIMEOUT_SECONDS = int(os.environ.get("HEARTBEAT_TIMEOUT_SECONDS", 30))
 
+    # Time zone used to show and enter exam times (e.g. "Asia/Kolkata"); default: this computer's zone.
+    TIMEZONE = os.environ.get("TIMEZONE", "")
+
     SEED_DEMO = _bool("SEED_DEMO", True)
     WTF_CSRF_TIME_LIMIT = None
     SESSION_COOKIE_HTTPONLY = True

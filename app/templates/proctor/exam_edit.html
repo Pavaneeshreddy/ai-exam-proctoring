@@ -12,7 +12,8 @@
     <div><h1>{{ exam.title if exam.id else 'Create exam' }}</h1><p>Set up the details, the AI proctoring policy and the questions.</p></div>
     <div class="page-actions">
       {% if exam.id %}<a class="btn" href="{{ url_for('proctor.exam_report', exam_id=exam.id) }}"><i data-lucide="bar-chart-3"></i> Results</a>{% endif %}
-      <button class="btn btn-primary"><i data-lucide="save"></i> Save exam</button>
+      <button class="btn"><i data-lucide="save"></i> Save</button>
+      {% if exam.status != 'published' %}<button class="btn btn-primary" name="publish" value="1"><i data-lucide="send"></i> Save & publish</button>{% endif %}
     </div>
   </div>
   <div class="tabs" id="tabs"><button type="button" class="active" data-tab="details">Details</button><button type="button" data-tab="proctoring">AI proctoring</button><button type="button" data-tab="questions">Questions <span class="badge" id="q-count">0</span></button></div>
@@ -28,13 +29,13 @@
       <div class="field"><label>Instructions shown before the exam</label><textarea class="input" name="instructions" rows="4">{{ exam.instructions or '' }}</textarea></div>
     </div>
     <div class="card card-pad">
-      <div class="field"><label>Status</label><select class="input" name="status">{% for st in ['draft','published','archived'] %}<option value="{{ st }}" {{ 'selected' if (exam.status or 'draft') == st }}>{{ st|capitalize }}</option>{% endfor %}</select></div>
+      <div class="field"><label>Status</label><select class="input" name="status">{% for st in ['draft','published','archived'] %}<option value="{{ st }}" {{ 'selected' if (exam.status or 'draft') == st }}>{{ st|capitalize }}</option>{% endfor %}</select><span class="hint">Students only see <b>Published</b> exams. Drafts are visible to staff only.</span></div>
       <div class="grid g-2" style="gap:12px">
         <div class="field"><label>Duration (min)</label><input class="input" type="number" min="1" name="duration_minutes" value="{{ exam.duration_minutes or 60 }}"></div>
         <div class="field"><label>Pass mark (%)</label><input class="input" type="number" min="0" max="100" name="pass_percent" value="{{ exam.pass_percent if exam.pass_percent is not none else 40 }}"></div>
       </div>
-      <div class="field"><label>Opens (UTC)</label><input class="input" type="datetime-local" name="start_at" value="{{ exam.start_at.strftime('%Y-%m-%dT%H:%M') if exam.start_at }}"></div>
-      <div class="field"><label>Closes (UTC)</label><input class="input" type="datetime-local" name="end_at" value="{{ exam.end_at.strftime('%Y-%m-%dT%H:%M') if exam.end_at }}"></div>
+      <div class="field"><label>Opens ({{ zone_label }})</label><input class="input" type="datetime-local" name="start_at" value="{{ exam.start_at|input_dt }}"><span class="hint">Leave empty to open immediately when published.</span></div>
+      <div class="field"><label>Closes ({{ zone_label }})</label><input class="input" type="datetime-local" name="end_at" value="{{ exam.end_at|input_dt }}"><span class="hint">Leave empty for no closing time.</span></div>
       <div class="grid g-2" style="gap:12px">
         <div class="field"><label>Attempts allowed</label><input class="input" type="number" min="1" name="max_attempts" value="{{ exam.max_attempts or 1 }}"></div>
         <div class="field"><label>Access code</label><input class="input" name="access_code" value="{{ exam.access_code or '' }}" placeholder="optional"></div>

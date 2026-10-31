@@ -8,3 +8,4 @@ opencv-python-headless>=4.9,<5
 # MySQL driver (only needed when DATABASE_URL points at MySQL)
 PyMySQL>=1.1
 cryptography>=42
+tzdata>=2024.1  # time zone names on Windows

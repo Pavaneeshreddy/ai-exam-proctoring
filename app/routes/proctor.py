@@ -12,7 +12,7 @@ from ..ai import engine, face_analyzer, object_detector
 from ..extensions import db
 from ..models import Answer, Exam, ExamSession, ProctorEvent, Question, User, utcnow
 from ..services import audit, event_weights, grade_session, recompute_score, score_time, sweep_sessions
-from ..utils import can_access_exam, staff_required, visible_exams_query
+from ..utils import can_access_exam, from_local, staff_required, to_local, visible_exams_query
 from .api import _visible_sessions_query
 
 bp = Blueprint("proctor", __name__)
@@ -208,7 +208,7 @@ def _parse_dt(value):
         return None
     for fmt in ("%Y-%m-%dT%H:%M", "%Y-%m-%d %H:%M", "%Y-%m-%dT%H:%M:%S"):
         try:
-            return datetime.strptime(value, fmt)
+            return from_local(datetime.strptime(value, fmt))
         except ValueError:
             continue
     return None
@@ -303,6 +303,8 @@ def exam_edit(exam_id=None):
     proctors = User.query.filter_by(role="proctor", is_active_flag=True).order_by(User.name).all()
     if request.method == "POST":
         _apply_exam_form(exam, request.form)
+        if request.form.get("publish"):
+            exam.status = "published"
         questions, errors = _validate_questions(request.form.get("questions_json"))
         if not exam.title:
             errors.insert(0, "Exam title is required.")
@@ -342,7 +344,7 @@ def exam_edit(exam_id=None):
                 exam.questions.remove(q)
         audit("exam_saved", f"exam:{exam.id}", exam.title)
         db.session.commit()
-        flash("Exam saved.", "success")
+        flash(_saved_message(exam), "success")
         return redirect(url_for("proctor.exam_edit", exam_id=exam.id))
     questions_json = json.dumps(
         [
@@ -352,6 +354,24 @@ def exam_edit(exam_id=None):
         ]
     )
     return render_template("proctor/exam_edit.html", exam=exam, proctors=proctors, questions_json=questions_json)
+
+
+def _saved_message(exam):
+    """Tell staff exactly where the exam now shows up and when students can start it."""
+    state = exam.availability()
+    if state == "draft":
+        return "Saved as a draft. Students cannot see it yet; click “Save & publish” when it is ready."
+    if state == "archived":
+        return "Saved. The exam is archived and hidden from students."
+    if state == "upcoming":
+        return f"Published. Students see it under “My exams” and can start it from {format_local(exam.start_at)}."
+    if state == "closed":
+        return f"Saved, but the closing time ({format_local(exam.end_at)}) has passed, so students cannot start it."
+    return "Published and open now. Students can start it from “My exams”; live candidates appear in Live monitor."
+
+
+def format_local(dt):
+    return to_local(dt).strftime("%d %b %Y, %H:%M") if dt else "now"
 
 
 @bp.route("/exams/<int:exam_id>/delete", methods=["POST"])

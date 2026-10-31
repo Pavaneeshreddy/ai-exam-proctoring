@@ -7,6 +7,7 @@ from config import Config
 from .ai import init_ai
 from .extensions import csrf, db, login_manager
 from .models import utcnow
+from .utils import to_local, zone_label
 
 
 def create_app(config_class=Config):
@@ -54,7 +55,12 @@ def _register_template_helpers(app):
 
     @app.template_filter("dt")
     def format_dt(value, fmt="%d %b %Y, %H:%M"):
-        return value.strftime(fmt) if value else "—"
+        return to_local(value).strftime(fmt) if value else "—"
+
+    @app.template_filter("input_dt")
+    def input_dt(value):
+        """Value for <input type=datetime-local> in local time."""
+        return to_local(value).strftime("%Y-%m-%dT%H:%M") if value else ""
 
     @app.template_filter("ago")
     def time_ago(value):
@@ -84,6 +90,7 @@ def _register_template_helpers(app):
             "event_catalog": engine.EVENT_CATALOG,
             "catalog_entry": engine.catalog_entry,
             "app_name": "ProctorAI",
+            "zone_label": zone_label(),
         }
 
 

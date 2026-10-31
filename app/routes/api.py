@@ -23,7 +23,7 @@ from ..services import (
     sweep_sessions,
     violation_count,
 )
-from ..utils import can_access_exam, staff_required
+from ..utils import can_access_exam, proctor_exam_filter, staff_required
 
 bp = Blueprint("api", __name__)
 
@@ -381,13 +381,11 @@ def _staff_session(session_id):
 
 
 def _visible_sessions_query():
-    from ..models import Exam, exam_proctors
+    from ..models import Exam
 
     q = ExamSession.query.join(Exam)
     if current_user.role == "proctor":
-        q = q.outerjoin(exam_proctors, exam_proctors.c.exam_id == Exam.id).filter(
-            (Exam.created_by_id == current_user.id) | (exam_proctors.c.user_id == current_user.id)
-        ).distinct()
+        q = q.filter(proctor_exam_filter(current_user))
     return q
 
 
